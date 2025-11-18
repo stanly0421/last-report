@@ -10,10 +10,12 @@ CONFIG += c++17
 
 SOURCES += \
     main.cpp \
-    widget.cpp
+    widget.cpp \
+    mahjongcalculator.cpp
 
 HEADERS += \
-    widget.h
+    widget.h \
+    mahjongcalculator.h
 
 FORMS += \
     widget.ui

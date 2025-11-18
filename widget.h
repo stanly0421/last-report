@@ -7,6 +7,9 @@
 #include <QGridLayout>
 #include <QVector>
 #include <QMessageBox>
+#include <QLineEdit>
+#include <QTextEdit>
+#include "mahjongcalculator.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -32,6 +35,7 @@ public:
 private slots:
     void onTileClicked();
     void resetGame();
+    void calculateTenpai();  // 新增：計算聽牌
 
 private:
     void initializeGame();
@@ -46,6 +50,12 @@ private:
     QLabel* scoreLabel;
     QPushButton* resetButton;
     QGridLayout* gameLayout;
+    
+    // 聽牌計算器相關組件
+    QLineEdit* handInput;
+    QPushButton* calculateButton;
+    QTextEdit* resultDisplay;
+    MahjongCalculator* calculator;
     
     int firstSelectedIndex;
     int secondSelectedIndex;
