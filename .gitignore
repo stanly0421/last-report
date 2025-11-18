@@ -1,1 +1,20 @@
 _codeql_detected_source_root
+
+# Compiled binaries
+test_calculator
+*.o
+*.exe
+
+# Qt build artifacts
+build/
+*.pro.user
+*.autosave
+moc_*
+ui_*
+qrc_*
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*~

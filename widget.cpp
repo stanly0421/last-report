@@ -2,6 +2,7 @@
 #include "ui_widget.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
+#include <QFrame>
 #include <QTime>
 #include <algorithm>
 #include <random>
@@ -13,6 +14,7 @@ Widget::Widget(QWidget *parent)
     , secondSelectedIndex(-1)
     , matchedPairs(0)
     , totalPairs(0)
+    , calculator(new MahjongCalculator())
 {
     ui->setupUi(this);
     
@@ -45,12 +47,53 @@ Widget::Widget(QWidget *parent)
     connect(resetButton, &QPushButton::clicked, this, &Widget::resetGame);
     mainLayout->addWidget(resetButton);
     
+    // 添加分隔線
+    QFrame* separator = new QFrame(this);
+    separator->setFrameShape(QFrame::HLine);
+    separator->setFrameShadow(QFrame::Sunken);
+    separator->setStyleSheet("background-color: #CCC; margin: 10px 0;");
+    mainLayout->addWidget(separator);
+    
+    // 聽牌計算器區域
+    QLabel* calculatorTitle = new QLabel("麻將聽牌計算器", this);
+    calculatorTitle->setAlignment(Qt::AlignCenter);
+    calculatorTitle->setStyleSheet("font-size: 16px; font-weight: bold; padding: 10px;");
+    mainLayout->addWidget(calculatorTitle);
+    
+    QLabel* instructionLabel = new QLabel("輸入手牌（例如：111萬、123456789萬、1234567東南西）：", this);
+    instructionLabel->setStyleSheet("font-size: 12px; padding: 5px;");
+    mainLayout->addWidget(instructionLabel);
+    
+    // 手牌輸入框
+    handInput = new QLineEdit(this);
+    handInput->setPlaceholderText("例如：111萬 或 123456789萬");
+    handInput->setStyleSheet("font-size: 14px; padding: 8px; border: 2px solid #CCC; border-radius: 5px;");
+    mainLayout->addWidget(handInput);
+    
+    // 計算按鈕
+    calculateButton = new QPushButton("計算聽牌", this);
+    calculateButton->setStyleSheet("font-size: 14px; padding: 10px; background-color: #2196F3; color: white; border-radius: 5px;");
+    connect(calculateButton, &QPushButton::clicked, this, &Widget::calculateTenpai);
+    mainLayout->addWidget(calculateButton);
+    
+    // 結果顯示區域
+    QLabel* resultLabel = new QLabel("計算結果：", this);
+    resultLabel->setStyleSheet("font-size: 12px; padding: 5px;");
+    mainLayout->addWidget(resultLabel);
+    
+    resultDisplay = new QTextEdit(this);
+    resultDisplay->setReadOnly(true);
+    resultDisplay->setMaximumHeight(100);
+    resultDisplay->setStyleSheet("font-size: 14px; padding: 8px; border: 2px solid #CCC; border-radius: 5px; background-color: #F5F5F5;");
+    mainLayout->addWidget(resultDisplay);
+    
     // 初始化遊戲
     initializeGame();
 }
 
 Widget::~Widget()
 {
+    delete calculator;
     delete ui;
 }
 
@@ -277,4 +320,28 @@ void Widget::resetGame()
 {
     initializeGame();
     statusLabel->setText("遊戲已重置。開始新的遊戲吧！");
+}
+
+void Widget::calculateTenpai()
+{
+    QString handTiles = handInput->text().trimmed();
+    
+    if (handTiles.isEmpty()) {
+        resultDisplay->setText("請輸入手牌！");
+        return;
+    }
+    
+    // 計算聽牌
+    QVector<QString> waitingTiles = calculator->calculateWaitingTiles(handTiles);
+    
+    // 顯示結果
+    if (waitingTiles.isEmpty()) {
+        resultDisplay->setText("此手牌無法聽牌，或輸入格式錯誤。\n\n請確保輸入格式正確，例如：\n- 111萬（三張1萬）\n- 123456789萬（1-9萬各一張）\n- 東東東南南南西西西（字牌組合）");
+    } else {
+        QString result = QString("聽牌結果：\n\n聽 %1 張牌：\n").arg(waitingTiles.size());
+        for (const QString& tile : waitingTiles) {
+            result += tile + " ";
+        }
+        resultDisplay->setText(result);
+    }
 }
