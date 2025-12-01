@@ -11,18 +11,8 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>麻將配對遊戲</string>
+   <string>音樂播放器 Music Player</string>
   </property>
-  <widget class="QWidget" name="centralWidget" native="true">
-   <property name="geometry">
-    <rect>
-     <x>0</x>
-     <y>0</y>
-     <width>800</width>
-     <height>600</height>
-    </rect>
-   </property>
-  </widget>
  </widget>
  <resources/>
  <connections/>
