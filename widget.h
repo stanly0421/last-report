@@ -6,6 +6,7 @@
 #include <QLabel>
 #include <QSlider>
 #include <QListWidget>
+#include <QListWidgetItem>
 #include <QComboBox>
 #include <QMediaPlayer>
 #include <QAudioOutput>

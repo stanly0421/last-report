@@ -656,8 +656,8 @@ void Widget::playSong(int index)
 void Widget::updateCoverArt(const QString& filePath)
 {
     // 嘗試從文件元數據讀取封面
-    // 注意：完整的實現需要使用 TagLib 或 FFmpeg 等庫
-    // 這裡提供一個簡化的實現
+    // TODO: 完整的實現需要使用 TagLib 或 FFmpeg 等庫來讀取 ID3 標籤中的封面
+    // 當前實現：搜尋同目錄下常見的封面圖片文件
     
     QPixmap defaultCover(200, 200);
     defaultCover.fill(QColor("#333"));
@@ -722,12 +722,14 @@ SongInfo Widget::extractSongInfo(const QString& filePath)
 
 void Widget::saveCurrentPlaylist()
 {
-    // 保存播放清單到文件（可選功能）
+    // TODO: 實現播放清單保存到文件的功能
+    // 可以使用 JSON 或 XML 格式保存播放清單數據
 }
 
 void Widget::loadPlaylist(int /* index */)
 {
-    // 從文件加載播放清單（可選功能）
+    // TODO: 實現從文件加載播放清單的功能
+    // 可以使用 JSON 或 XML 格式讀取播放清單數據
 }
 
 void Widget::updateButtonStates()
