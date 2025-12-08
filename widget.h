@@ -17,6 +17,7 @@
 #include <QUrl>
 #include <QMap>
 #include <QList>
+#include <QSet>
 #include <QFileInfo>
 
 QT_BEGIN_NAMESPACE
@@ -76,6 +77,9 @@ private slots:
     void onDeletePlaylistClicked();
     void onPlaylistChanged(int index);
     
+    // 封面上傳
+    void onUploadCoverClicked();
+    
     // 播放器狀態
     void onMediaStatusChanged(QMediaPlayer::MediaStatus status);
     void onPlaybackStateChanged(QMediaPlayer::PlaybackState state);
@@ -97,6 +101,8 @@ private:
     void updateNextSongDisplay();
     int getNextSongIndex();
     int getRandomSongIndex(bool excludeCurrent = true);
+    void saveCustomCover(const QString& songPath, const QString& coverPath);
+    QString getCustomCoverPath(const QString& songPath);
 
     Ui::Widget *ui;
     
@@ -122,6 +128,7 @@ private:
     QPushButton* removeSongButton;
     QPushButton* newPlaylistButton;
     QPushButton* deletePlaylistButton;
+    QPushButton* uploadCoverButton;
     QListWidget* playlistWidget;
     QComboBox* playlistComboBox;
     
@@ -133,6 +140,7 @@ private:
     bool isShuffleMode;
     bool isRepeatMode;
     QString lastPlaylistName;
+    QSet<int> playedSongsInCurrentSession;
 };
 
 #endif // WIDGET_H
