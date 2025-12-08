@@ -1,8 +1,11 @@
 _codeql_detected_source_root
 build_test/
+build/
 *.o
 moc_*.cpp
 ui_*.h
 *.pro.user
 Makefile
 .qmake.stash
+widget_old.cpp
+*.backup

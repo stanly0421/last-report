@@ -63,7 +63,6 @@ private slots:
     
     // 搜尋功能
     void onSearchClicked();
-    void onSearchFinished();
     
     // 播放清單管理
     void onAddToPlaylistClicked();
