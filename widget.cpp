@@ -107,6 +107,24 @@ void Widget::setupUI()
     );
     coverLabel->setText("無封面\nNo Cover");
     coverLayout->addWidget(coverLabel);
+    
+    // 添加上傳封面按鈕
+    uploadCoverButton = new QPushButton("📁 上傳封面", this);
+    uploadCoverButton->setStyleSheet(
+        "QPushButton {"
+        "   background-color: #9E9E9E;"
+        "   color: white;"
+        "   border: none;"
+        "   padding: 6px 12px;"
+        "   font-size: 12px;"
+        "   border-radius: 3px;"
+        "}"
+        "QPushButton:hover { background-color: #757575; }"
+        "QPushButton:disabled { background-color: #E0E0E0; color: #9E9E9E; }"
+    );
+    uploadCoverButton->setEnabled(false);
+    coverLayout->addWidget(uploadCoverButton);
+    
     coverLayout->addStretch();
     topLayout->addLayout(coverLayout);
     
@@ -314,6 +332,10 @@ void Widget::setupUI()
         "   background-color: #4CAF50;"
         "   color: white;"
         "}"
+        "QListWidget::item:selected:hover {"
+        "   background-color: #45a049;"
+        "   color: white;"
+        "}"
         "QListWidget::item:hover {"
         "   background-color: #e8f5e9;"
         "}"
@@ -377,6 +399,10 @@ void Widget::createConnections()
     connect(addSongsButton, &QPushButton::clicked, this, &Widget::onAddSongsClicked);
     connect(removeSongButton, &QPushButton::clicked, this, &Widget::onRemoveSongClicked);
     connect(playlistWidget, &QListWidget::itemDoubleClicked, this, &Widget::onSongDoubleClicked);
+    connect(playlistWidget, &QListWidget::itemSelectionChanged, this, &Widget::updateButtonStates);
+    
+    // 封面上傳
+    connect(uploadCoverButton, &QPushButton::clicked, this, &Widget::onUploadCoverClicked);
     
     // 拖放排序
     connect(playlistWidget->model(), &QAbstractItemModel::rowsMoved, this, [this]() {
@@ -479,6 +505,9 @@ void Widget::onShuffleClicked()
     isShuffleMode = !isShuffleMode;
     shuffleButton->setChecked(isShuffleMode);
     
+    // Reset played songs when shuffle mode changes
+    playedSongsInCurrentSession.clear();
+    
     if (isShuffleMode) {
         shuffleButton->setStyleSheet(
             "QPushButton {"
@@ -517,6 +546,11 @@ void Widget::onRepeatClicked()
 {
     isRepeatMode = !isRepeatMode;
     repeatButton->setChecked(isRepeatMode);
+    
+    // Reset played songs when repeat mode changes
+    if (!isRepeatMode) {
+        playedSongsInCurrentSession.clear();
+    }
     
     if (isRepeatMode) {
         repeatButton->setStyleSheet(
@@ -653,7 +687,14 @@ void Widget::onNewPlaylistClicked()
         newPlaylist.name = name;
         playlists.append(newPlaylist);
         playlistComboBox->addItem(name);
-        playlistComboBox->setCurrentIndex(playlists.size() - 1);
+        // Set the newly created playlist as the current one
+        int newIndex = playlists.size() - 1;
+        playlistComboBox->setCurrentIndex(newIndex);
+        currentPlaylistIndex = newIndex;
+        lastPlaylistName = name;
+        updatePlaylistDisplay();
+        updateButtonStates();
+        updateNextSongDisplay();
         
         // 創建播放清單資料夾
         QString playlistDir = QStandardPaths::writableLocation(QStandardPaths::MusicLocation) + "/MusicPlayerPlaylists/" + name;
@@ -691,6 +732,7 @@ void Widget::onPlaylistChanged(int index)
     
     currentPlaylistIndex = index;
     currentSongIndex = -1;
+    playedSongsInCurrentSession.clear();
     updatePlaylistDisplay();
     updateButtonStates();
     updateNextSongDisplay();
@@ -699,7 +741,22 @@ void Widget::onPlaylistChanged(int index)
 void Widget::onMediaStatusChanged(QMediaPlayer::MediaStatus status)
 {
     if (status == QMediaPlayer::EndOfMedia) {
-        // 自動播放下一首
+        if (currentPlaylistIndex < 0 || currentPlaylistIndex >= playlists.size()) return;
+        
+        Playlist& playlist = playlists[currentPlaylistIndex];
+        
+        // Check if we should stop or continue playing
+        if (!isRepeatMode) {
+            // Check if all songs have been played
+            if (playedSongsInCurrentSession.size() >= playlist.songs.size()) {
+                // All songs have been played once, pause playback
+                player->pause();
+                playedSongsInCurrentSession.clear();
+                return;
+            }
+        }
+        
+        // Auto-play next song
         if (isRepeatMode && currentSongIndex >= 0) {
             // 循環模式：重複播放當前歌曲
             playSong(currentSongIndex);
@@ -765,6 +822,11 @@ void Widget::playSong(int index)
     currentSongIndex = index;
     const SongInfo& song = playlist.songs[index];
     
+    // Track played songs when not in repeat mode
+    if (!isRepeatMode) {
+        playedSongsInCurrentSession.insert(index);
+    }
+    
     // 設置媒體源
     player->setSource(QUrl::fromLocalFile(song.filePath));
     player->play();
@@ -775,6 +837,7 @@ void Widget::playSong(int index)
     updateCoverArt(song.filePath);
     updatePlaylistDisplay();
     updateNextSongDisplay();
+    updateButtonStates();
     
     // 選中當前歌曲
     playlistWidget->setCurrentRow(index);
@@ -782,6 +845,17 @@ void Widget::playSong(int index)
 
 void Widget::updateCoverArt(const QString& filePath)
 {
+    // 首先檢查是否有自定義封面
+    QString customCoverPath = getCustomCoverPath(filePath);
+    if (!customCoverPath.isEmpty() && QFile::exists(customCoverPath)) {
+        QPixmap cover(customCoverPath);
+        if (!cover.isNull()) {
+            coverLabel->setPixmap(cover.scaled(200, 200, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+            coverLabel->setText("");
+            return;
+        }
+    }
+    
     // 嘗試從文件元數據讀取封面
     // TODO: 完整的實現需要使用 TagLib 或 FFmpeg 等庫來讀取 ID3 標籤中的封面
     // 當前實現：搜尋同目錄下常見的封面圖片文件
@@ -801,6 +875,7 @@ void Widget::updateCoverArt(const QString& filePath)
             QPixmap cover(coverPath);
             if (!cover.isNull()) {
                 coverLabel->setPixmap(cover.scaled(200, 200, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+                coverLabel->setText("");
                 return;
             }
         }
@@ -865,12 +940,14 @@ void Widget::updateButtonStates()
     bool hasSongs = hasPlaylist && !playlists[currentPlaylistIndex].songs.isEmpty();
     int selectedRow = playlistWidget->currentRow();
     bool hasSelection = selectedRow >= 0;
+    bool hasSongPlaying = currentSongIndex >= 0;
     
     playPauseButton->setEnabled(hasSongs);
     previousButton->setEnabled(hasSongs);
     nextButton->setEnabled(hasSongs);
     removeSongButton->setEnabled(hasSelection);
     deletePlaylistButton->setEnabled(playlists.size() > 1);
+    uploadCoverButton->setEnabled(hasSongPlaying);
 }
 
 void Widget::savePlaylistsToFile()
@@ -1028,4 +1105,62 @@ int Widget::getRandomSongIndex(bool excludeCurrent)
         newIndex = QRandomGenerator::global()->bounded(playlist.songs.size());
     } while (newIndex == currentSongIndex);
     return newIndex;
+}
+
+void Widget::onUploadCoverClicked()
+{
+    if (currentPlaylistIndex < 0 || currentPlaylistIndex >= playlists.size()) return;
+    if (currentSongIndex < 0) return;
+    
+    Playlist& playlist = playlists[currentPlaylistIndex];
+    if (currentSongIndex >= playlist.songs.size()) return;
+    
+    QString imageFile = QFileDialog::getOpenFileName(
+        this,
+        "選擇封面圖片",
+        QDir::homePath(),
+        "圖片檔案 (*.jpg *.jpeg *.png *.bmp *.gif);;所有檔案 (*.*)"
+    );
+    
+    if (imageFile.isEmpty()) return;
+    
+    const SongInfo& song = playlist.songs[currentSongIndex];
+    saveCustomCover(song.filePath, imageFile);
+    updateCoverArt(song.filePath);
+}
+
+void Widget::saveCustomCover(const QString& songPath, const QString& coverPath)
+{
+    QString configDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/covers";
+    QDir dir;
+    if (!dir.exists(configDir)) {
+        dir.mkpath(configDir);
+    }
+    
+    // 使用歌曲路徑的hash作為封面文件名
+    QString hash = QString::number(qHash(songPath));
+    QFileInfo coverInfo(coverPath);
+    QString ext = coverInfo.suffix();
+    QString targetPath = configDir + "/" + hash + "." + ext;
+    
+    // 複製封面到配置目錄
+    QFile::remove(targetPath);  // 如果已存在則刪除
+    QFile::copy(coverPath, targetPath);
+}
+
+QString Widget::getCustomCoverPath(const QString& songPath)
+{
+    QString configDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/covers";
+    QString hash = QString::number(qHash(songPath));
+    
+    // 嘗試常見的圖片擴展名
+    QStringList extensions = {"jpg", "jpeg", "png", "bmp", "gif"};
+    for (const QString& ext : extensions) {
+        QString coverPath = configDir + "/" + hash + "." + ext;
+        if (QFile::exists(coverPath)) {
+            return coverPath;
+        }
+    }
+    
+    return QString();
 }
