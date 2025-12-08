@@ -672,7 +672,6 @@ void Widget::onAddSongsClicked()
                 }
                 // Replace the old song
                 playlist.songs[duplicateIndex] = info;
-                existingTitles[info.title] = duplicateIndex;
             }
             // If No, skip adding this song
         } else {
@@ -1181,7 +1180,7 @@ int Widget::getRandomSongIndex(bool excludeCurrent)
     
     if (playlist.songs.size() == 1) {
         // Only one song - can only return it if not excluded
-        if (excludeCurrent && 0 == currentSongIndex) {
+        if (excludeCurrent && currentSongIndex == 0) {
             return -1; // Can't play the only song if it's excluded
         }
         return 0;
