@@ -51,9 +51,10 @@ public:
 private slots:
     // 播放控制
     void onPlayPauseClicked();
-    void onStopClicked();
     void onPreviousClicked();
     void onNextClicked();
+    void onShuffleClicked();
+    void onRepeatClicked();
     
     // 進度控制
     void onPositionChanged(qint64 position);
@@ -68,8 +69,6 @@ private slots:
     // 播放清單管理
     void onAddSongsClicked();
     void onRemoveSongClicked();
-    void onMoveUpClicked();
-    void onMoveDownClicked();
     void onSongDoubleClicked(QListWidgetItem* item);
     
     // 播放清單選擇
@@ -93,6 +92,11 @@ private:
     void saveCurrentPlaylist();
     void loadPlaylist(int index);
     void updateButtonStates();
+    void savePlaylistsToFile();
+    void loadPlaylistsFromFile();
+    void updateNextSongDisplay();
+    int getNextSongIndex();
+    int getRandomSongIndex(bool excludeCurrent = true);
 
     Ui::Widget *ui;
     
@@ -104,18 +108,18 @@ private:
     QLabel* coverLabel;
     QLabel* songTitleLabel;
     QLabel* artistLabel;
+    QLabel* nextSongLabel;
     QLabel* timeLabel;
     QSlider* progressSlider;
     QSlider* volumeSlider;
     QLabel* volumeLabel;
     QPushButton* playPauseButton;
-    QPushButton* stopButton;
     QPushButton* previousButton;
     QPushButton* nextButton;
+    QPushButton* shuffleButton;
+    QPushButton* repeatButton;
     QPushButton* addSongsButton;
     QPushButton* removeSongButton;
-    QPushButton* moveUpButton;
-    QPushButton* moveDownButton;
     QPushButton* newPlaylistButton;
     QPushButton* deletePlaylistButton;
     QListWidget* playlistWidget;
@@ -126,6 +130,9 @@ private:
     int currentPlaylistIndex;
     int currentSongIndex;
     bool isSliderBeingDragged;
+    bool isShuffleMode;
+    bool isRepeatMode;
+    QString lastPlaylistName;
 };
 
 #endif // WIDGET_H

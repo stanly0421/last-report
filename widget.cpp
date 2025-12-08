@@ -9,6 +9,11 @@
 #include <QBuffer>
 #include <QFile>
 #include <QDir>
+#include <QRandomGenerator>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonArray>
+#include <QStandardPaths>
 
 Widget::Widget(QWidget *parent)
     : QWidget(parent)
@@ -18,6 +23,8 @@ Widget::Widget(QWidget *parent)
     , currentPlaylistIndex(-1)
     , currentSongIndex(-1)
     , isSliderBeingDragged(false)
+    , isShuffleMode(false)
+    , isRepeatMode(false)
 {
     ui->setupUi(this);
     
@@ -35,12 +42,34 @@ Widget::Widget(QWidget *parent)
     // 建立信號連接
     createConnections();
     
-    // 創建默認播放清單
-    Playlist defaultPlaylist;
-    defaultPlaylist.name = "默認播放清單";
-    playlists.append(defaultPlaylist);
-    playlistComboBox->addItem(defaultPlaylist.name);
-    currentPlaylistIndex = 0;
+    // 加載保存的播放清單
+    loadPlaylistsFromFile();
+    
+    // 如果沒有播放清單，創建默認播放清單
+    if (playlists.isEmpty()) {
+        Playlist defaultPlaylist;
+        defaultPlaylist.name = "默認播放清單";
+        playlists.append(defaultPlaylist);
+        playlistComboBox->addItem(defaultPlaylist.name);
+        currentPlaylistIndex = 0;
+    } else {
+        // 恢復播放清單到ComboBox
+        for (const Playlist& playlist : playlists) {
+            playlistComboBox->addItem(playlist.name);
+        }
+        
+        // 恢復上次的播放清單
+        int lastIndex = 0;
+        for (int i = 0; i < playlists.size(); i++) {
+            if (playlists[i].name == lastPlaylistName) {
+                lastIndex = i;
+                break;
+            }
+        }
+        playlistComboBox->setCurrentIndex(lastIndex);
+        currentPlaylistIndex = lastIndex;
+        updatePlaylistDisplay();
+    }
     
     // 更新按鈕狀態
     updateButtonStates();
@@ -48,6 +77,8 @@ Widget::Widget(QWidget *parent)
 
 Widget::~Widget()
 {
+    // 保存播放清單
+    savePlaylistsToFile();
     delete ui;
 }
 
@@ -95,6 +126,12 @@ void Widget::setupUI()
     
     // 進度條區域
     QVBoxLayout* progressLayout = new QVBoxLayout();
+    
+    // 下一首歌曲提示
+    nextSongLabel = new QLabel("", this);
+    nextSongLabel->setStyleSheet("font-size: 11px; color: #888; font-style: italic;");
+    nextSongLabel->setAlignment(Qt::AlignCenter);
+    progressLayout->addWidget(nextSongLabel);
     
     progressSlider = new QSlider(Qt::Horizontal, this);
     progressSlider->setRange(0, 0);
@@ -163,13 +200,20 @@ void Widget::setupUI()
     playPauseButton->setStyleSheet(buttonStyle);
     controlLayout->addWidget(playPauseButton);
     
-    stopButton = new QPushButton("⏹ 停止", this);
-    stopButton->setStyleSheet(buttonStyle);
-    controlLayout->addWidget(stopButton);
-    
     nextButton = new QPushButton("⏭ 下一首", this);
     nextButton->setStyleSheet(buttonStyle);
     controlLayout->addWidget(nextButton);
+    
+    // 播放模式按鈕
+    shuffleButton = new QPushButton("🔀 隨機", this);
+    shuffleButton->setStyleSheet(buttonStyle);
+    shuffleButton->setCheckable(true);
+    controlLayout->addWidget(shuffleButton);
+    
+    repeatButton = new QPushButton("🔁 循環", this);
+    repeatButton->setStyleSheet(buttonStyle);
+    repeatButton->setCheckable(true);
+    controlLayout->addWidget(repeatButton);
     
     controlLayout->addStretch();
     
@@ -253,6 +297,9 @@ void Widget::setupUI()
     
     // 歌曲列表
     playlistWidget = new QListWidget(this);
+    playlistWidget->setDragDropMode(QAbstractItemView::InternalMove);
+    playlistWidget->setDefaultDropAction(Qt::MoveAction);
+    playlistWidget->setSelectionMode(QAbstractItemView::SingleSelection);
     playlistWidget->setStyleSheet(
         "QListWidget {"
         "   border: 1px solid #ccc;"
@@ -296,14 +343,6 @@ void Widget::setupUI()
     removeSongButton->setStyleSheet(smallButtonStyle);
     songButtonLayout->addWidget(removeSongButton);
     
-    moveUpButton = new QPushButton("上移", this);
-    moveUpButton->setStyleSheet(smallButtonStyle);
-    songButtonLayout->addWidget(moveUpButton);
-    
-    moveDownButton = new QPushButton("下移", this);
-    moveDownButton->setStyleSheet(smallButtonStyle);
-    songButtonLayout->addWidget(moveDownButton);
-    
     playlistGroupLayout->addLayout(songButtonLayout);
     
     bottomLayout->addWidget(playlistGroupBox);
@@ -321,9 +360,10 @@ void Widget::createConnections()
     
     // 播放控制按鈕
     connect(playPauseButton, &QPushButton::clicked, this, &Widget::onPlayPauseClicked);
-    connect(stopButton, &QPushButton::clicked, this, &Widget::onStopClicked);
     connect(previousButton, &QPushButton::clicked, this, &Widget::onPreviousClicked);
     connect(nextButton, &QPushButton::clicked, this, &Widget::onNextClicked);
+    connect(shuffleButton, &QPushButton::clicked, this, &Widget::onShuffleClicked);
+    connect(repeatButton, &QPushButton::clicked, this, &Widget::onRepeatClicked);
     
     // 進度條
     connect(progressSlider, &QSlider::sliderMoved, this, &Widget::onProgressSliderMoved);
@@ -336,9 +376,43 @@ void Widget::createConnections()
     // 播放清單管理
     connect(addSongsButton, &QPushButton::clicked, this, &Widget::onAddSongsClicked);
     connect(removeSongButton, &QPushButton::clicked, this, &Widget::onRemoveSongClicked);
-    connect(moveUpButton, &QPushButton::clicked, this, &Widget::onMoveUpClicked);
-    connect(moveDownButton, &QPushButton::clicked, this, &Widget::onMoveDownClicked);
     connect(playlistWidget, &QListWidget::itemDoubleClicked, this, &Widget::onSongDoubleClicked);
+    
+    // 拖放排序
+    connect(playlistWidget->model(), &QAbstractItemModel::rowsMoved, this, [this]() {
+        // 更新內部數據結構以匹配新順序
+        if (currentPlaylistIndex < 0 || currentPlaylistIndex >= playlists.size()) return;
+        
+        Playlist& playlist = playlists[currentPlaylistIndex];
+        QList<SongInfo> newSongs;
+        
+        // 使用存儲在item中的索引來重建歌曲列表
+        for (int i = 0; i < playlistWidget->count(); i++) {
+            QListWidgetItem* item = playlistWidget->item(i);
+            int originalIndex = item->data(Qt::UserRole).toInt();
+            
+            if (originalIndex >= 0 && originalIndex < playlist.songs.size()) {
+                newSongs.append(playlist.songs[originalIndex]);
+            }
+        }
+        
+        if (newSongs.size() == playlist.songs.size()) {
+            // 更新當前播放歌曲的索引
+            if (currentSongIndex >= 0 && currentSongIndex < playlist.songs.size()) {
+                const SongInfo& currentSong = playlist.songs[currentSongIndex];
+                for (int i = 0; i < newSongs.size(); i++) {
+                    if (newSongs[i].filePath == currentSong.filePath) {
+                        currentSongIndex = i;
+                        break;
+                    }
+                }
+            }
+            
+            playlist.songs = newSongs;
+            updatePlaylistDisplay();
+            updateNextSongDisplay();
+        }
+    });
     
     // 播放清單選擇
     connect(newPlaylistButton, &QPushButton::clicked, this, &Widget::onNewPlaylistClicked);
@@ -365,13 +439,6 @@ void Widget::onPlayPauseClicked()
     }
 }
 
-void Widget::onStopClicked()
-{
-    player->stop();
-    progressSlider->setValue(0);
-    updateTimeDisplay(0, player->duration());
-}
-
 void Widget::onPreviousClicked()
 {
     if (currentPlaylistIndex < 0 || currentPlaylistIndex >= playlists.size()) return;
@@ -379,11 +446,19 @@ void Widget::onPreviousClicked()
     Playlist& playlist = playlists[currentPlaylistIndex];
     if (playlist.songs.isEmpty()) return;
     
-    int newIndex = currentSongIndex - 1;
-    if (newIndex < 0) {
-        newIndex = playlist.songs.size() - 1; // 循環到最後一首
+    if (isShuffleMode) {
+        // 隨機模式：隨機選擇一首不同的歌
+        int newIndex = getRandomSongIndex(true);
+        if (newIndex >= 0) {
+            playSong(newIndex);
+        }
+    } else {
+        int newIndex = currentSongIndex - 1;
+        if (newIndex < 0) {
+            newIndex = playlist.songs.size() - 1; // 循環到最後一首
+        }
+        playSong(newIndex);
     }
-    playSong(newIndex);
 }
 
 void Widget::onNextClicked()
@@ -393,11 +468,88 @@ void Widget::onNextClicked()
     Playlist& playlist = playlists[currentPlaylistIndex];
     if (playlist.songs.isEmpty()) return;
     
-    int newIndex = currentSongIndex + 1;
-    if (newIndex >= playlist.songs.size()) {
-        newIndex = 0; // 循環到第一首
+    int newIndex = getNextSongIndex();
+    if (newIndex >= 0) {
+        playSong(newIndex);
     }
-    playSong(newIndex);
+}
+
+void Widget::onShuffleClicked()
+{
+    isShuffleMode = !isShuffleMode;
+    shuffleButton->setChecked(isShuffleMode);
+    
+    if (isShuffleMode) {
+        shuffleButton->setStyleSheet(
+            "QPushButton {"
+            "   background-color: #FF9800;"
+            "   color: white;"
+            "   border: none;"
+            "   padding: 10px 20px;"
+            "   font-size: 14px;"
+            "   border-radius: 5px;"
+            "   min-width: 80px;"
+            "}"
+            "QPushButton:hover {"
+            "   background-color: #F57C00;"
+            "}"
+        );
+    } else {
+        shuffleButton->setStyleSheet(
+            "QPushButton {"
+            "   background-color: #4CAF50;"
+            "   color: white;"
+            "   border: none;"
+            "   padding: 10px 20px;"
+            "   font-size: 14px;"
+            "   border-radius: 5px;"
+            "   min-width: 80px;"
+            "}"
+            "QPushButton:hover {"
+            "   background-color: #45a049;"
+            "}"
+        );
+    }
+    updateNextSongDisplay();
+}
+
+void Widget::onRepeatClicked()
+{
+    isRepeatMode = !isRepeatMode;
+    repeatButton->setChecked(isRepeatMode);
+    
+    if (isRepeatMode) {
+        repeatButton->setStyleSheet(
+            "QPushButton {"
+            "   background-color: #FF9800;"
+            "   color: white;"
+            "   border: none;"
+            "   padding: 10px 20px;"
+            "   font-size: 14px;"
+            "   border-radius: 5px;"
+            "   min-width: 80px;"
+            "}"
+            "QPushButton:hover {"
+            "   background-color: #F57C00;"
+            "}"
+        );
+    } else {
+        repeatButton->setStyleSheet(
+            "QPushButton {"
+            "   background-color: #4CAF50;"
+            "   color: white;"
+            "   border: none;"
+            "   padding: 10px 20px;"
+            "   font-size: 14px;"
+            "   border-radius: 5px;"
+            "   min-width: 80px;"
+            "}"
+            "QPushButton:hover {"
+            "   background-color: #45a049;"
+            "}"
+        );
+    }
+    updateNextSongDisplay();
 }
 
 void Widget::onPositionChanged(qint64 position)
@@ -457,6 +609,7 @@ void Widget::onAddSongsClicked()
     
     updatePlaylistDisplay();
     updateButtonStates();
+    updateNextSongDisplay();
 }
 
 void Widget::onRemoveSongClicked()
@@ -479,51 +632,8 @@ void Widget::onRemoveSongClicked()
         playlist.songs.removeAt(selectedRow);
         updatePlaylistDisplay();
         updateButtonStates();
+        updateNextSongDisplay();
     }
-}
-
-void Widget::onMoveUpClicked()
-{
-    if (currentPlaylistIndex < 0 || currentPlaylistIndex >= playlists.size()) return;
-    
-    int selectedRow = playlistWidget->currentRow();
-    if (selectedRow <= 0) return;
-    
-    Playlist& playlist = playlists[currentPlaylistIndex];
-    if (selectedRow < playlist.songs.size()) {
-        playlist.songs.swapItemsAt(selectedRow, selectedRow - 1);
-        
-        // 更新當前歌曲索引
-        if (currentSongIndex == selectedRow) {
-            currentSongIndex = selectedRow - 1;
-        } else if (currentSongIndex == selectedRow - 1) {
-            currentSongIndex = selectedRow;
-        }
-        
-        updatePlaylistDisplay();
-        playlistWidget->setCurrentRow(selectedRow - 1);
-    }
-}
-
-void Widget::onMoveDownClicked()
-{
-    if (currentPlaylistIndex < 0 || currentPlaylistIndex >= playlists.size()) return;
-    
-    Playlist& playlist = playlists[currentPlaylistIndex];
-    int selectedRow = playlistWidget->currentRow();
-    if (selectedRow < 0 || selectedRow >= playlist.songs.size() - 1) return;
-    
-    playlist.songs.swapItemsAt(selectedRow, selectedRow + 1);
-    
-    // 更新當前歌曲索引
-    if (currentSongIndex == selectedRow) {
-        currentSongIndex = selectedRow + 1;
-    } else if (currentSongIndex == selectedRow + 1) {
-        currentSongIndex = selectedRow;
-    }
-    
-    updatePlaylistDisplay();
-    playlistWidget->setCurrentRow(selectedRow + 1);
 }
 
 void Widget::onSongDoubleClicked(QListWidgetItem* item)
@@ -544,6 +654,13 @@ void Widget::onNewPlaylistClicked()
         playlists.append(newPlaylist);
         playlistComboBox->addItem(name);
         playlistComboBox->setCurrentIndex(playlists.size() - 1);
+        
+        // 創建播放清單資料夾
+        QString playlistDir = QStandardPaths::writableLocation(QStandardPaths::MusicLocation) + "/MusicPlayerPlaylists/" + name;
+        QDir dir;
+        if (!dir.exists(playlistDir)) {
+            dir.mkpath(playlistDir);
+        }
     }
 }
 
@@ -576,13 +693,19 @@ void Widget::onPlaylistChanged(int index)
     currentSongIndex = -1;
     updatePlaylistDisplay();
     updateButtonStates();
+    updateNextSongDisplay();
 }
 
 void Widget::onMediaStatusChanged(QMediaPlayer::MediaStatus status)
 {
     if (status == QMediaPlayer::EndOfMedia) {
         // 自動播放下一首
-        onNextClicked();
+        if (isRepeatMode && currentSongIndex >= 0) {
+            // 循環模式：重複播放當前歌曲
+            playSong(currentSongIndex);
+        } else {
+            onNextClicked();
+        }
     }
 }
 
@@ -617,6 +740,9 @@ void Widget::updatePlaylistDisplay()
         
         QListWidgetItem* item = new QListWidgetItem(displayText);
         
+        // 存儲歌曲在列表中的索引，用於拖放操作
+        item->setData(Qt::UserRole, i);
+        
         // 高亮當前播放的歌曲
         if (i == currentSongIndex) {
             QFont font = item->font();
@@ -648,6 +774,7 @@ void Widget::playSong(int index)
     artistLabel->setText(song.artist);
     updateCoverArt(song.filePath);
     updatePlaylistDisplay();
+    updateNextSongDisplay();
     
     // 選中當前歌曲
     playlistWidget->setCurrentRow(index);
@@ -740,11 +867,165 @@ void Widget::updateButtonStates()
     bool hasSelection = selectedRow >= 0;
     
     playPauseButton->setEnabled(hasSongs);
-    stopButton->setEnabled(hasSongs);
     previousButton->setEnabled(hasSongs);
     nextButton->setEnabled(hasSongs);
     removeSongButton->setEnabled(hasSelection);
-    moveUpButton->setEnabled(hasSelection && selectedRow > 0);
-    moveDownButton->setEnabled(hasSelection && hasSongs && selectedRow < playlists[currentPlaylistIndex].songs.size() - 1);
     deletePlaylistButton->setEnabled(playlists.size() > 1);
+}
+
+void Widget::savePlaylistsToFile()
+{
+    QString configDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QDir dir;
+    if (!dir.exists(configDir)) {
+        dir.mkpath(configDir);
+    }
+    
+    QString configFile = configDir + "/playlists.json";
+    
+    QJsonObject rootObj;
+    QJsonArray playlistsArray;
+    
+    for (const Playlist& playlist : playlists) {
+        QJsonObject playlistObj;
+        playlistObj["name"] = playlist.name;
+        
+        QJsonArray songsArray;
+        for (const SongInfo& song : playlist.songs) {
+            QJsonObject songObj;
+            songObj["filePath"] = song.filePath;
+            songObj["title"] = song.title;
+            songObj["artist"] = song.artist;
+            songsArray.append(songObj);
+        }
+        playlistObj["songs"] = songsArray;
+        playlistsArray.append(playlistObj);
+    }
+    
+    rootObj["playlists"] = playlistsArray;
+    if (currentPlaylistIndex >= 0 && currentPlaylistIndex < playlists.size()) {
+        rootObj["lastPlaylist"] = playlists[currentPlaylistIndex].name;
+    }
+    
+    QJsonDocument doc(rootObj);
+    QFile file(configFile);
+    if (file.open(QIODevice::WriteOnly)) {
+        file.write(doc.toJson());
+        file.close();
+    }
+}
+
+void Widget::loadPlaylistsFromFile()
+{
+    QString configDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QString configFile = configDir + "/playlists.json";
+    
+    QFile file(configFile);
+    if (!file.exists() || !file.open(QIODevice::ReadOnly)) {
+        return;
+    }
+    
+    QByteArray data = file.readAll();
+    file.close();
+    
+    QJsonDocument doc = QJsonDocument::fromJson(data);
+    if (!doc.isObject()) {
+        return;
+    }
+    
+    QJsonObject rootObj = doc.object();
+    lastPlaylistName = rootObj["lastPlaylist"].toString();
+    
+    QJsonArray playlistsArray = rootObj["playlists"].toArray();
+    playlists.clear();
+    
+    for (const QJsonValue& value : playlistsArray) {
+        QJsonObject playlistObj = value.toObject();
+        Playlist playlist;
+        playlist.name = playlistObj["name"].toString();
+        
+        QJsonArray songsArray = playlistObj["songs"].toArray();
+        for (const QJsonValue& songValue : songsArray) {
+            QJsonObject songObj = songValue.toObject();
+            SongInfo song;
+            song.filePath = songObj["filePath"].toString();
+            song.title = songObj["title"].toString();
+            song.artist = songObj["artist"].toString();
+            song.duration = 0;
+            
+            // 檢查文件是否仍然存在
+            if (QFile::exists(song.filePath)) {
+                playlist.songs.append(song);
+            }
+        }
+        playlists.append(playlist);
+    }
+}
+
+void Widget::updateNextSongDisplay()
+{
+    if (currentPlaylistIndex < 0 || currentPlaylistIndex >= playlists.size()) {
+        nextSongLabel->setText("");
+        return;
+    }
+    
+    Playlist& playlist = playlists[currentPlaylistIndex];
+    if (playlist.songs.isEmpty() || currentSongIndex < 0) {
+        nextSongLabel->setText("");
+        return;
+    }
+    
+    int nextIndex = getNextSongIndex();
+    if (nextIndex >= 0 && nextIndex < playlist.songs.size()) {
+        const SongInfo& nextSong = playlist.songs[nextIndex];
+        QString nextText = QString("▶ 下一首: %1").arg(nextSong.title);
+        if (!nextSong.artist.isEmpty()) {
+            nextText += QString(" - %1").arg(nextSong.artist);
+        }
+        nextSongLabel->setText(nextText);
+    } else {
+        nextSongLabel->setText("");
+    }
+}
+
+int Widget::getNextSongIndex()
+{
+    if (currentPlaylistIndex < 0 || currentPlaylistIndex >= playlists.size()) return -1;
+    
+    Playlist& playlist = playlists[currentPlaylistIndex];
+    if (playlist.songs.isEmpty()) return -1;
+    
+    if (isShuffleMode) {
+        return getRandomSongIndex(true);
+    } else {
+        // 順序模式
+        int newIndex = currentSongIndex + 1;
+        if (newIndex >= playlist.songs.size()) {
+            newIndex = 0; // 循環到第一首
+        }
+        return newIndex;
+    }
+}
+
+int Widget::getRandomSongIndex(bool excludeCurrent)
+{
+    if (currentPlaylistIndex < 0 || currentPlaylistIndex >= playlists.size()) return -1;
+    
+    Playlist& playlist = playlists[currentPlaylistIndex];
+    if (playlist.songs.isEmpty()) return -1;
+    
+    if (playlist.songs.size() == 1) {
+        return 0;
+    }
+    
+    if (!excludeCurrent || currentSongIndex < 0) {
+        return QRandomGenerator::global()->bounded(playlist.songs.size());
+    }
+    
+    // 隨機選擇一首不同的歌曲
+    int newIndex;
+    do {
+        newIndex = QRandomGenerator::global()->bounded(playlist.songs.size());
+    } while (newIndex == currentSongIndex);
+    return newIndex;
 }
