@@ -96,6 +96,7 @@ private:
     void loadPlaylistsFromFile();
     void updateNextSongDisplay();
     int getNextSongIndex();
+    int getRandomSongIndex(bool excludeCurrent = true);
 
     Ui::Widget *ui;
     

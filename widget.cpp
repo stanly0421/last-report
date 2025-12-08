@@ -448,15 +448,10 @@ void Widget::onPreviousClicked()
     
     if (isShuffleMode) {
         // 隨機模式：隨機選擇一首不同的歌
-        if (playlist.songs.size() <= 1) {
-            playSong(0);
-            return;
+        int newIndex = getRandomSongIndex(true);
+        if (newIndex >= 0) {
+            playSong(newIndex);
         }
-        int newIndex;
-        do {
-            newIndex = QRandomGenerator::global()->bounded(playlist.songs.size());
-        } while (newIndex == currentSongIndex);
-        playSong(newIndex);
     } else {
         int newIndex = currentSongIndex - 1;
         if (newIndex < 0) {
@@ -1001,15 +996,7 @@ int Widget::getNextSongIndex()
     if (playlist.songs.isEmpty()) return -1;
     
     if (isShuffleMode) {
-        // 隨機模式：隨機選擇一首歌（不包括當前歌曲）
-        if (playlist.songs.size() <= 1) {
-            return 0;
-        }
-        int newIndex;
-        do {
-            newIndex = QRandomGenerator::global()->bounded(playlist.songs.size());
-        } while (newIndex == currentSongIndex && playlist.songs.size() > 1);
-        return newIndex;
+        return getRandomSongIndex(true);
     } else {
         // 順序模式
         int newIndex = currentSongIndex + 1;
@@ -1018,4 +1005,27 @@ int Widget::getNextSongIndex()
         }
         return newIndex;
     }
+}
+
+int Widget::getRandomSongIndex(bool excludeCurrent)
+{
+    if (currentPlaylistIndex < 0 || currentPlaylistIndex >= playlists.size()) return -1;
+    
+    Playlist& playlist = playlists[currentPlaylistIndex];
+    if (playlist.songs.isEmpty()) return -1;
+    
+    if (playlist.songs.size() == 1) {
+        return 0;
+    }
+    
+    if (!excludeCurrent || currentSongIndex < 0) {
+        return QRandomGenerator::global()->bounded(playlist.songs.size());
+    }
+    
+    // 隨機選擇一首不同的歌曲
+    int newIndex;
+    do {
+        newIndex = QRandomGenerator::global()->bounded(playlist.songs.size());
+    } while (newIndex == currentSongIndex);
+    return newIndex;
 }
