@@ -38,8 +38,8 @@ if "%api_key%"=="" (
 REM Backup original file
 copy widget.cpp widget.cpp.backup >nul
 
-REM Replace the API key in widget.cpp using PowerShell
-powershell -Command "(Get-Content widget.cpp) -replace 'apiKey\(\"[^\"]*\"\)', 'apiKey(\"%api_key%\")' | Set-Content widget.cpp"
+REM Replace the API key in widget.cpp using PowerShell with a more specific pattern
+powershell -Command "(Get-Content widget.cpp) -replace 'apiKey\(\"YOUR_YOUTUBE_API_KEY_HERE\"\)', 'apiKey(\"%api_key%\")' | Set-Content widget.cpp"
 
 if %errorlevel% equ 0 (
     echo.

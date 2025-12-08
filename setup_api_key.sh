@@ -38,8 +38,8 @@ fi
 cp widget.cpp widget.cpp.backup
 
 # Replace the API key in widget.cpp
-# Look for the line with apiKey and replace it
-sed -i "s/apiKey(\"[^\"]*\")/apiKey(\"$api_key\")/" widget.cpp
+# Use a more specific pattern that matches the constructor initialization
+sed -i "s/apiKey(\"YOUR_YOUTUBE_API_KEY_HERE\")/apiKey(\"$api_key\")/" widget.cpp
 
 if [ $? -eq 0 ]; then
     echo ""

@@ -86,7 +86,6 @@ private:
     void updateButtonStates();
     void savePlaylistsToFile();
     void loadPlaylistsFromFile();
-    void updateNextVideoDisplay();
     int getNextVideoIndex();
     int getRandomVideoIndex(bool excludeCurrent = true);
     QList<int> getUnplayedVideoIndices(bool excludeCurrent = true);

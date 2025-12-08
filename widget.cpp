@@ -14,7 +14,7 @@ Widget::Widget(QWidget *parent)
     : QWidget(parent)
     , ui(new Ui::Widget)
     , networkManager(new QNetworkAccessManager(this))
-    , apiKey("AIzaSyBWZ7R5x8KqJ0vN_8YnxLqP9VqM4XhEjQ0")  // 示範用 API Key，實際使用時請替換
+    , apiKey("YOUR_YOUTUBE_API_KEY_HERE")  // 請使用 setup_api_key.sh 或 setup_api_key.bat 設置您的 API Key
     , currentPlaylistIndex(-1)
     , currentVideoIndex(-1)
     , isShuffleMode(false)
@@ -526,8 +526,9 @@ void Widget::onPlayPauseClicked()
         isPlaying = !isPlaying;
         playPauseButton->setText(isPlaying ? "⏸" : "▶");
         
-        // 注意：實際的播放/暫停需要通過 JavaScript 與 YouTube iframe API 互動
-        // 這裡簡化處理
+        // 注意：完整的播放/暫停控制需要通過 JavaScript 與 YouTube iframe API 互動
+        // 目前實作為簡化版本，實際播放控制由 YouTube 嵌入播放器處理
+        // 未來可以通過 QWebEngineView::page()->runJavaScript() 實現完整控制
     } else {
         // 沒有影片，播放播放清單第一首
         if (currentPlaylistIndex >= 0 && currentPlaylistIndex < playlists.size()) {
@@ -606,7 +607,6 @@ void Widget::onShuffleClicked()
             "QPushButton:hover { background-color: #404040; }"
         );
     }
-    updateNextVideoDisplay();
 }
 
 void Widget::onRepeatClicked()
@@ -641,7 +641,6 @@ void Widget::onRepeatClicked()
             "QPushButton:hover { background-color: #404040; }"
         );
     }
-    updateNextVideoDisplay();
 }
 
 void Widget::onAddToPlaylistClicked()
@@ -699,7 +698,6 @@ void Widget::onRemoveVideoClicked()
         playlist.videos.removeAt(selectedRow);
         updatePlaylistDisplay();
         updateButtonStates();
-        updateNextVideoDisplay();
     }
 }
 
@@ -795,7 +793,6 @@ void Widget::onNewPlaylistClicked()
         lastPlaylistName = name;
         updatePlaylistDisplay();
         updateButtonStates();
-        updateNextVideoDisplay();
     }
 }
 
@@ -830,7 +827,6 @@ void Widget::onPlaylistChanged(int index)
     playedVideosInCurrentSession.clear();
     updatePlaylistDisplay();
     updateButtonStates();
-    updateNextVideoDisplay();
 }
 
 void Widget::updatePlaylistDisplay()
@@ -893,7 +889,6 @@ void Widget::playVideo(int index)
     }
     
     updatePlaylistDisplay();
-    updateNextVideoDisplay();
     updateButtonStates();
     
     playlistWidget->setCurrentRow(index);
@@ -1006,11 +1001,6 @@ void Widget::loadPlaylistsFromFile()
         }
         playlists.append(playlist);
     }
-}
-
-void Widget::updateNextVideoDisplay()
-{
-    // 可以在未來添加 "下一首" 提示
 }
 
 int Widget::getNextVideoIndex()
