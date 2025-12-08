@@ -505,8 +505,8 @@ void Widget::onShuffleClicked()
     isShuffleMode = !isShuffleMode;
     shuffleButton->setChecked(isShuffleMode);
     
-    // Reset played songs when shuffle mode changes
-    if (!isShuffleMode) {
+    // Reset played songs when entering shuffle mode
+    if (isShuffleMode) {
         playedSongsInCurrentSession.clear();
     }
     
@@ -875,10 +875,8 @@ void Widget::playSong(int index)
     currentSongIndex = index;
     const SongInfo& song = playlist.songs[index];
     
-    // Track played songs when not in repeat mode
-    if (!isRepeatMode) {
-        playedSongsInCurrentSession.insert(index);
-    }
+    // Track played songs for proper behavior
+    playedSongsInCurrentSession.insert(index);
     
     // 設置媒體源
     player->setSource(QUrl::fromLocalFile(song.filePath));
@@ -1140,8 +1138,8 @@ int Widget::getNextSongIndex()
                 if (playedSongsInCurrentSession.size() >= playlist.songs.size()) {
                     return -1; // All songs played, stop
                 }
-                // Loop back to find unplayed songs
-                return 0;
+                // Not all songs played, but reached end - shouldn't normally happen in sequential mode
+                return -1;
             }
         }
         return newIndex;
