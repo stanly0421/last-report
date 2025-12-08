@@ -506,7 +506,9 @@ void Widget::onShuffleClicked()
     shuffleButton->setChecked(isShuffleMode);
     
     // Reset played songs when shuffle mode changes
-    playedSongsInCurrentSession.clear();
+    if (!isShuffleMode) {
+        playedSongsInCurrentSession.clear();
+    }
     
     if (isShuffleMode) {
         shuffleButton->setStyleSheet(
@@ -638,7 +640,37 @@ void Widget::onAddSongsClicked()
     Playlist& playlist = playlists[currentPlaylistIndex];
     for (const QString& file : files) {
         SongInfo info = extractSongInfo(file);
-        playlist.songs.append(info);
+        
+        // Check for duplicate song title
+        int duplicateIndex = -1;
+        for (int i = 0; i < playlist.songs.size(); i++) {
+            if (playlist.songs[i].title == info.title) {
+                duplicateIndex = i;
+                break;
+            }
+        }
+        
+        if (duplicateIndex >= 0) {
+            // Found duplicate, ask user whether to replace
+            QMessageBox msgBox(this);
+            msgBox.setWindowTitle("重複的歌曲");
+            msgBox.setText(QString("播放清單中已存在歌曲「%1」").arg(info.title));
+            msgBox.setInformativeText("是否要取代舊的歌曲？");
+            msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
+            msgBox.setDefaultButton(QMessageBox::No);
+            msgBox.button(QMessageBox::Yes)->setText("是");
+            msgBox.button(QMessageBox::No)->setText("否");
+            
+            int ret = msgBox.exec();
+            if (ret == QMessageBox::Yes) {
+                // Replace the old song
+                playlist.songs[duplicateIndex] = info;
+            }
+            // If No, skip adding this song
+        } else {
+            // No duplicate, add the song
+            playlist.songs.append(info);
+        }
     }
     
     updatePlaylistDisplay();
@@ -745,23 +777,44 @@ void Widget::onMediaStatusChanged(QMediaPlayer::MediaStatus status)
         
         Playlist& playlist = playlists[currentPlaylistIndex];
         
-        // Check if we should stop or continue playing
-        if (!isRepeatMode) {
-            // Check if all songs have been played
-            if (playedSongsInCurrentSession.size() >= playlist.songs.size()) {
-                // All songs have been played once, pause playback
-                player->pause();
-                playedSongsInCurrentSession.clear();
-                return;
+        if (isShuffleMode) {
+            // In shuffle mode, try to get next unplayed song
+            int nextIndex = getNextSongIndex();
+            if (nextIndex >= 0) {
+                playSong(nextIndex);
+            } else {
+                // No more unplayed songs
+                if (!isRepeatMode) {
+                    // Stop playback if repeat mode is off
+                    player->stop();
+                    playedSongsInCurrentSession.clear();
+                } else {
+                    // In repeat mode, reset and continue
+                    playedSongsInCurrentSession.clear();
+                    int newIndex = getNextSongIndex();
+                    if (newIndex >= 0) {
+                        playSong(newIndex);
+                    }
+                }
             }
-        }
-        
-        // Auto-play next song
-        if (isRepeatMode && currentSongIndex >= 0) {
-            // 循環模式：重複播放當前歌曲
-            playSong(currentSongIndex);
         } else {
-            onNextClicked();
+            // In sequential mode
+            int nextIndex = currentSongIndex + 1;
+            if (nextIndex >= playlist.songs.size()) {
+                // Reached end of playlist
+                if (isRepeatMode) {
+                    // Loop back to first song
+                    playedSongsInCurrentSession.clear();
+                    playSong(0);
+                } else {
+                    // Stop playback
+                    player->stop();
+                    playedSongsInCurrentSession.clear();
+                }
+            } else {
+                // Play next song in sequence
+                playSong(nextIndex);
+            }
         }
     }
 }
@@ -1075,10 +1128,21 @@ int Widget::getNextSongIndex()
     if (isShuffleMode) {
         return getRandomSongIndex(true);
     } else {
-        // 順序模式
+        // Sequential mode - check if there are unplayed songs ahead
         int newIndex = currentSongIndex + 1;
         if (newIndex >= playlist.songs.size()) {
-            newIndex = 0; // 循環到第一首
+            // Reached end of playlist
+            if (isRepeatMode) {
+                // Loop back to beginning
+                return 0;
+            } else {
+                // Check if all songs have been played
+                if (playedSongsInCurrentSession.size() >= playlist.songs.size()) {
+                    return -1; // All songs played, stop
+                }
+                // Loop back to find unplayed songs
+                return 0;
+            }
         }
         return newIndex;
     }
@@ -1095,16 +1159,35 @@ int Widget::getRandomSongIndex(bool excludeCurrent)
         return 0;
     }
     
-    if (!excludeCurrent || currentSongIndex < 0) {
-        return QRandomGenerator::global()->bounded(playlist.songs.size());
+    // Build a list of unplayed songs
+    QList<int> unplayedSongs;
+    for (int i = 0; i < playlist.songs.size(); i++) {
+        if (!playedSongsInCurrentSession.contains(i)) {
+            if (!excludeCurrent || i != currentSongIndex) {
+                unplayedSongs.append(i);
+            }
+        }
     }
     
-    // 隨機選擇一首不同的歌曲
-    int newIndex;
-    do {
-        newIndex = QRandomGenerator::global()->bounded(playlist.songs.size());
-    } while (newIndex == currentSongIndex);
-    return newIndex;
+    // If all songs have been played and repeat mode is on, reset and play any song
+    if (unplayedSongs.isEmpty() && isRepeatMode) {
+        playedSongsInCurrentSession.clear();
+        // Rebuild the list
+        for (int i = 0; i < playlist.songs.size(); i++) {
+            if (!excludeCurrent || i != currentSongIndex) {
+                unplayedSongs.append(i);
+            }
+        }
+    }
+    
+    // If still empty, return -1 (no songs to play)
+    if (unplayedSongs.isEmpty()) {
+        return -1;
+    }
+    
+    // Randomly select from unplayed songs
+    int randomIndex = QRandomGenerator::global()->bounded(unplayedSongs.size());
+    return unplayedSongs[randomIndex];
 }
 
 void Widget::onUploadCoverClicked()
