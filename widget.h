@@ -101,6 +101,7 @@ private:
     void updateNextSongDisplay();
     int getNextSongIndex();
     int getRandomSongIndex(bool excludeCurrent = true);
+    QList<int> getUnplayedSongIndices(bool excludeCurrent = true);
     void saveCustomCover(const QString& songPath, const QString& coverPath);
     QString getCustomCoverPath(const QString& songPath);
 

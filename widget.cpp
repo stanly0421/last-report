@@ -1126,7 +1126,7 @@ int Widget::getNextSongIndex()
     if (isShuffleMode) {
         return getRandomSongIndex(true);
     } else {
-        // Sequential mode - check if there are unplayed songs ahead
+        // Sequential mode - simply get the next song in order
         int newIndex = currentSongIndex + 1;
         if (newIndex >= playlist.songs.size()) {
             // Reached end of playlist
@@ -1134,16 +1134,33 @@ int Widget::getNextSongIndex()
                 // Loop back to beginning
                 return 0;
             } else {
-                // Check if all songs have been played
-                if (playedSongsInCurrentSession.size() >= playlist.songs.size()) {
-                    return -1; // All songs played, stop
-                }
-                // Not all songs played, but reached end - shouldn't normally happen in sequential mode
+                // No repeat, stop at the end
                 return -1;
             }
         }
         return newIndex;
     }
+}
+
+QList<int> Widget::getUnplayedSongIndices(bool excludeCurrent)
+{
+    QList<int> unplayedSongs;
+    
+    if (currentPlaylistIndex < 0 || currentPlaylistIndex >= playlists.size()) {
+        return unplayedSongs;
+    }
+    
+    Playlist& playlist = playlists[currentPlaylistIndex];
+    
+    for (int i = 0; i < playlist.songs.size(); i++) {
+        if (!playedSongsInCurrentSession.contains(i)) {
+            if (!excludeCurrent || i != currentSongIndex) {
+                unplayedSongs.append(i);
+            }
+        }
+    }
+    
+    return unplayedSongs;
 }
 
 int Widget::getRandomSongIndex(bool excludeCurrent)
@@ -1158,24 +1175,13 @@ int Widget::getRandomSongIndex(bool excludeCurrent)
     }
     
     // Build a list of unplayed songs
-    QList<int> unplayedSongs;
-    for (int i = 0; i < playlist.songs.size(); i++) {
-        if (!playedSongsInCurrentSession.contains(i)) {
-            if (!excludeCurrent || i != currentSongIndex) {
-                unplayedSongs.append(i);
-            }
-        }
-    }
+    QList<int> unplayedSongs = getUnplayedSongIndices(excludeCurrent);
     
     // If all songs have been played and repeat mode is on, reset and play any song
     if (unplayedSongs.isEmpty() && isRepeatMode) {
         playedSongsInCurrentSession.clear();
         // Rebuild the list
-        for (int i = 0; i < playlist.songs.size(); i++) {
-            if (!excludeCurrent || i != currentSongIndex) {
-                unplayedSongs.append(i);
-            }
-        }
+        unplayedSongs = getUnplayedSongIndices(excludeCurrent);
     }
     
     // If still empty, return -1 (no songs to play)
