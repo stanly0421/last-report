@@ -505,8 +505,10 @@ void Widget::onShuffleClicked()
     isShuffleMode = !isShuffleMode;
     shuffleButton->setChecked(isShuffleMode);
     
-    // Reset played songs when shuffle mode changes
-    playedSongsInCurrentSession.clear();
+    // Reset played songs when entering shuffle mode
+    if (isShuffleMode) {
+        playedSongsInCurrentSession.clear();
+    }
     
     if (isShuffleMode) {
         shuffleButton->setStyleSheet(
@@ -636,9 +638,47 @@ void Widget::onAddSongsClicked()
     if (files.isEmpty()) return;
     
     Playlist& playlist = playlists[currentPlaylistIndex];
+    
+    // Build a hash map of existing song titles for O(1) lookup
+    QMap<QString, int> existingTitles;
+    for (int i = 0; i < playlist.songs.size(); i++) {
+        existingTitles[playlist.songs[i].title] = i;
+    }
+    
     for (const QString& file : files) {
         SongInfo info = extractSongInfo(file);
-        playlist.songs.append(info);
+        
+        // Check for duplicate song title using hash map
+        if (existingTitles.contains(info.title)) {
+            int duplicateIndex = existingTitles[info.title];
+            
+            // Found duplicate, ask user whether to replace
+            QMessageBox msgBox(this);
+            msgBox.setWindowTitle("重複的歌曲");
+            msgBox.setText(QString("播放清單中已存在歌曲「%1」").arg(info.title));
+            msgBox.setInformativeText("是否要取代舊的歌曲？");
+            msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
+            msgBox.setDefaultButton(QMessageBox::No);
+            msgBox.button(QMessageBox::Yes)->setText("是");
+            msgBox.button(QMessageBox::No)->setText("否");
+            
+            int ret = msgBox.exec();
+            if (ret == QMessageBox::Yes) {
+                // Check if replacing currently playing song
+                if (duplicateIndex == currentSongIndex) {
+                    // Stop playback if replacing currently playing song
+                    player->stop();
+                    currentSongIndex = -1;
+                }
+                // Replace the old song
+                playlist.songs[duplicateIndex] = info;
+            }
+            // If No, skip adding this song
+        } else {
+            // No duplicate, add the song
+            existingTitles[info.title] = playlist.songs.size();
+            playlist.songs.append(info);
+        }
     }
     
     updatePlaylistDisplay();
@@ -745,23 +785,44 @@ void Widget::onMediaStatusChanged(QMediaPlayer::MediaStatus status)
         
         Playlist& playlist = playlists[currentPlaylistIndex];
         
-        // Check if we should stop or continue playing
-        if (!isRepeatMode) {
-            // Check if all songs have been played
-            if (playedSongsInCurrentSession.size() >= playlist.songs.size()) {
-                // All songs have been played once, pause playback
-                player->pause();
-                playedSongsInCurrentSession.clear();
-                return;
+        if (isShuffleMode) {
+            // In shuffle mode, try to get next unplayed song
+            int nextIndex = getNextSongIndex();
+            if (nextIndex >= 0) {
+                playSong(nextIndex);
+            } else {
+                // No more unplayed songs
+                if (!isRepeatMode) {
+                    // Stop playback if repeat mode is off
+                    player->stop();
+                    playedSongsInCurrentSession.clear();
+                } else {
+                    // In repeat mode, reset and continue
+                    playedSongsInCurrentSession.clear();
+                    int newIndex = getNextSongIndex();
+                    if (newIndex >= 0) {
+                        playSong(newIndex);
+                    }
+                }
             }
-        }
-        
-        // Auto-play next song
-        if (isRepeatMode && currentSongIndex >= 0) {
-            // 循環模式：重複播放當前歌曲
-            playSong(currentSongIndex);
         } else {
-            onNextClicked();
+            // In sequential mode
+            int nextIndex = currentSongIndex + 1;
+            if (nextIndex >= playlist.songs.size()) {
+                // Reached end of playlist
+                if (isRepeatMode) {
+                    // Loop back to first song
+                    playedSongsInCurrentSession.clear();
+                    playSong(0);
+                } else {
+                    // Stop playback
+                    player->stop();
+                    playedSongsInCurrentSession.clear();
+                }
+            } else {
+                // Play next song in sequence
+                playSong(nextIndex);
+            }
         }
     }
 }
@@ -822,10 +883,8 @@ void Widget::playSong(int index)
     currentSongIndex = index;
     const SongInfo& song = playlist.songs[index];
     
-    // Track played songs when not in repeat mode
-    if (!isRepeatMode) {
-        playedSongsInCurrentSession.insert(index);
-    }
+    // Track played songs for proper behavior
+    playedSongsInCurrentSession.insert(index);
     
     // 設置媒體源
     player->setSource(QUrl::fromLocalFile(song.filePath));
@@ -1075,13 +1134,41 @@ int Widget::getNextSongIndex()
     if (isShuffleMode) {
         return getRandomSongIndex(true);
     } else {
-        // 順序模式
+        // Sequential mode - simply get the next song in order
         int newIndex = currentSongIndex + 1;
         if (newIndex >= playlist.songs.size()) {
-            newIndex = 0; // 循環到第一首
+            // Reached end of playlist
+            if (isRepeatMode) {
+                // Loop back to beginning
+                return 0;
+            } else {
+                // No repeat, stop at the end
+                return -1;
+            }
         }
         return newIndex;
     }
+}
+
+QList<int> Widget::getUnplayedSongIndices(bool excludeCurrent)
+{
+    QList<int> unplayedSongs;
+    
+    if (currentPlaylistIndex < 0 || currentPlaylistIndex >= playlists.size()) {
+        return unplayedSongs;
+    }
+    
+    Playlist& playlist = playlists[currentPlaylistIndex];
+    
+    for (int i = 0; i < playlist.songs.size(); i++) {
+        if (!playedSongsInCurrentSession.contains(i)) {
+            if (!excludeCurrent || i != currentSongIndex) {
+                unplayedSongs.append(i);
+            }
+        }
+    }
+    
+    return unplayedSongs;
 }
 
 int Widget::getRandomSongIndex(bool excludeCurrent)
@@ -1092,19 +1179,31 @@ int Widget::getRandomSongIndex(bool excludeCurrent)
     if (playlist.songs.isEmpty()) return -1;
     
     if (playlist.songs.size() == 1) {
+        // Only one song - can only return it if not excluded
+        if (excludeCurrent && currentSongIndex == 0) {
+            return -1; // Can't play the only song if it's excluded
+        }
         return 0;
     }
     
-    if (!excludeCurrent || currentSongIndex < 0) {
-        return QRandomGenerator::global()->bounded(playlist.songs.size());
+    // Build a list of unplayed songs
+    QList<int> unplayedSongs = getUnplayedSongIndices(excludeCurrent);
+    
+    // If all songs have been played and repeat mode is on, reset and play any song
+    if (unplayedSongs.isEmpty() && isRepeatMode) {
+        playedSongsInCurrentSession.clear();
+        // Rebuild the list
+        unplayedSongs = getUnplayedSongIndices(excludeCurrent);
     }
     
-    // 隨機選擇一首不同的歌曲
-    int newIndex;
-    do {
-        newIndex = QRandomGenerator::global()->bounded(playlist.songs.size());
-    } while (newIndex == currentSongIndex);
-    return newIndex;
+    // If still empty, return -1 (no songs to play)
+    if (unplayedSongs.isEmpty()) {
+        return -1;
+    }
+    
+    // Randomly select from unplayed songs
+    int randomIndex = QRandomGenerator::global()->bounded(unplayedSongs.size());
+    return unplayedSongs[randomIndex];
 }
 
 void Widget::onUploadCoverClicked()
