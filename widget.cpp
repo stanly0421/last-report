@@ -638,19 +638,20 @@ void Widget::onAddSongsClicked()
     if (files.isEmpty()) return;
     
     Playlist& playlist = playlists[currentPlaylistIndex];
+    
+    // Build a hash map of existing song titles for O(1) lookup
+    QMap<QString, int> existingTitles;
+    for (int i = 0; i < playlist.songs.size(); i++) {
+        existingTitles[playlist.songs[i].title] = i;
+    }
+    
     for (const QString& file : files) {
         SongInfo info = extractSongInfo(file);
         
-        // Check for duplicate song title
-        int duplicateIndex = -1;
-        for (int i = 0; i < playlist.songs.size(); i++) {
-            if (playlist.songs[i].title == info.title) {
-                duplicateIndex = i;
-                break;
-            }
-        }
-        
-        if (duplicateIndex >= 0) {
+        // Check for duplicate song title using hash map
+        if (existingTitles.contains(info.title)) {
+            int duplicateIndex = existingTitles[info.title];
+            
             // Found duplicate, ask user whether to replace
             QMessageBox msgBox(this);
             msgBox.setWindowTitle("重複的歌曲");
@@ -663,12 +664,20 @@ void Widget::onAddSongsClicked()
             
             int ret = msgBox.exec();
             if (ret == QMessageBox::Yes) {
+                // Check if replacing currently playing song
+                if (duplicateIndex == currentSongIndex) {
+                    // Stop playback if replacing currently playing song
+                    player->stop();
+                    currentSongIndex = -1;
+                }
                 // Replace the old song
                 playlist.songs[duplicateIndex] = info;
+                existingTitles[info.title] = duplicateIndex;
             }
             // If No, skip adding this song
         } else {
             // No duplicate, add the song
+            existingTitles[info.title] = playlist.songs.size();
             playlist.songs.append(info);
         }
     }
@@ -1171,6 +1180,10 @@ int Widget::getRandomSongIndex(bool excludeCurrent)
     if (playlist.songs.isEmpty()) return -1;
     
     if (playlist.songs.size() == 1) {
+        // Only one song - can only return it if not excluded
+        if (excludeCurrent && 0 == currentSongIndex) {
+            return -1; // Can't play the only song if it's excluded
+        }
         return 0;
     }
     
