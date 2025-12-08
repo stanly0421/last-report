@@ -386,31 +386,28 @@ void Widget::createConnections()
         Playlist& playlist = playlists[currentPlaylistIndex];
         QList<SongInfo> newSongs;
         
+        // 使用存儲在item中的索引來重建歌曲列表
         for (int i = 0; i < playlistWidget->count(); i++) {
             QListWidgetItem* item = playlistWidget->item(i);
-            QString displayText = item->text();
+            int originalIndex = item->data(Qt::UserRole).toInt();
             
-            // 從顯示文本中提取歌曲索引
-            int dotIndex = displayText.indexOf('.');
-            if (dotIndex > 0) {
-                // 移除編號前綴，獲取歌曲標題
-                QString titlePart = displayText.mid(dotIndex + 2);
-                
-                // 在原始列表中查找匹配的歌曲
-                for (const SongInfo& song : playlist.songs) {
-                    QString songDisplay = song.title;
-                    if (!song.artist.isEmpty()) {
-                        songDisplay += QString(" - %1").arg(song.artist);
-                    }
-                    if (titlePart == songDisplay) {
-                        newSongs.append(song);
-                        break;
-                    }
-                }
+            if (originalIndex >= 0 && originalIndex < playlist.songs.size()) {
+                newSongs.append(playlist.songs[originalIndex]);
             }
         }
         
         if (newSongs.size() == playlist.songs.size()) {
+            // 更新當前播放歌曲的索引
+            if (currentSongIndex >= 0 && currentSongIndex < playlist.songs.size()) {
+                const SongInfo& currentSong = playlist.songs[currentSongIndex];
+                for (int i = 0; i < newSongs.size(); i++) {
+                    if (newSongs[i].filePath == currentSong.filePath) {
+                        currentSongIndex = i;
+                        break;
+                    }
+                }
+            }
+            
             playlist.songs = newSongs;
             updatePlaylistDisplay();
             updateNextSongDisplay();
@@ -450,8 +447,15 @@ void Widget::onPreviousClicked()
     if (playlist.songs.isEmpty()) return;
     
     if (isShuffleMode) {
-        // 隨機模式：隨機選擇一首歌
-        int newIndex = QRandomGenerator::global()->bounded(playlist.songs.size());
+        // 隨機模式：隨機選擇一首不同的歌
+        if (playlist.songs.size() <= 1) {
+            playSong(0);
+            return;
+        }
+        int newIndex;
+        do {
+            newIndex = QRandomGenerator::global()->bounded(playlist.songs.size());
+        } while (newIndex == currentSongIndex);
         playSong(newIndex);
     } else {
         int newIndex = currentSongIndex - 1;
@@ -740,6 +744,9 @@ void Widget::updatePlaylistDisplay()
         }
         
         QListWidgetItem* item = new QListWidgetItem(displayText);
+        
+        // 存儲歌曲在列表中的索引，用於拖放操作
+        item->setData(Qt::UserRole, i);
         
         // 高亮當前播放的歌曲
         if (i == currentSongIndex) {
