@@ -2,6 +2,15 @@
 
 這是一個使用 Qt6 C++ 和 Qt WebEngine 開發的 YouTube 音樂播放器，靈感來自 Spotify 的設計風格。
 
+> **⚠️ 重要**: 本專案需要 **Qt WebEngine** 模組。如果遇到 `Unknown module(s) in QT: webenginewidgets` 錯誤，請參考 [INSTALL.md](INSTALL.md) 獲取完整安裝指南。
+
+## 快速開始
+
+1. **檢查依賴**: 執行 `./check_webengine.sh` (Linux/macOS) 或 `check_webengine.bat` (Windows)
+2. **安裝 Qt WebEngine**: 如果檢查失敗，參考 [INSTALL.md](INSTALL.md)
+3. **編譯**: 使用 CMake 或 qmake (詳見下方說明)
+4. **設置 API Key**: 在 `widget.cpp` 中設置您的 YouTube API key
+
 ## 功能特色
 
 ### 1. YouTube 影片搜尋
@@ -224,6 +233,31 @@ cmake --build .
 - 添加播放歷史記錄
 - 支援深色/淺色主題切換
 - 實作迷你播放器模式
+
+## 疑難排解 (Troubleshooting)
+
+### 編譯錯誤: "Unknown module(s) in QT: webenginewidgets"
+
+這是最常見的錯誤，表示 Qt WebEngine 模組未安裝。
+
+**解決步驟**:
+1. 執行檢查腳本確認問題:
+   ```bash
+   ./check_webengine.sh        # Linux/macOS
+   check_webengine.bat          # Windows
+   ```
+
+2. 按照腳本提示安裝 Qt WebEngine
+
+3. 參考 [INSTALL.md](INSTALL.md) 獲取詳細說明
+
+### 其他常見問題
+
+- **找不到 qmake**: 確認 Qt 已正確安裝並加入 PATH
+- **CMake 找不到 Qt**: 設置 `CMAKE_PREFIX_PATH` 環境變數
+- **缺少 DLL (Windows)**: 將 Qt bin 目錄加入 PATH 或複製所需 DLL
+
+完整的疑難排解指南請參考 [INSTALL.md](INSTALL.md)。
 
 ## 授權聲明
 
