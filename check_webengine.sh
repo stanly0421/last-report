@@ -81,7 +81,7 @@ else
     echo ""
     echo "請安裝 Qt WebEngine 模組："
     echo ""
-    
+
     # Detect OS and provide specific instructions
     if [ -f /etc/os-release ]; then
         . /etc/os-release
