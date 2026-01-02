@@ -2,6 +2,15 @@
 
 這是一個使用 Qt6 C++ 和 Qt WebEngine 開發的 YouTube 音樂播放器，靈感來自 Spotify 的設計風格。
 
+> **⚠️ 重要**: 本專案需要 **Qt WebEngine** 模組。如果遇到 `Unknown module(s) in QT: webenginewidgets` 錯誤，請參考 [INSTALL.md](INSTALL.md) 獲取完整安裝指南。
+
+## 快速開始
+
+1. **檢查依賴**: 執行 `./check_webengine.sh` (Linux/macOS) 或 `check_webengine.bat` (Windows)
+2. **安裝 Qt WebEngine**: 如果檢查失敗，參考 [INSTALL.md](INSTALL.md)
+3. **編譯**: 使用 CMake 或 qmake (詳見下方說明)
+4. **設置 API Key**: 在 `widget.cpp` 中設置您的 YouTube API key
+
 ## 功能特色
 
 ### 1. YouTube 影片搜尋
@@ -69,15 +78,60 @@
 
 ### 系統需求
 - Qt 6.x 或更高版本
-- Qt WebEngine 模組
+- **Qt WebEngine 模組** (必須安裝)
 - Qt Network 模組
+- Qt Multimedia 模組
 - C++17 編譯器
 - 穩定的網路連線
 
-### 安裝依賴 (Ubuntu/Debian)
+### 安裝依賴
+
+#### Ubuntu/Debian
 ```bash
-sudo apt-get install qt6-base-dev qt6-webengine-dev
+# 安裝 Qt 6 和必要模組
+sudo apt-get update
+sudo apt-get install qt6-base-dev qt6-webengine-dev qt6-multimedia-dev
+
+# 或安裝 Qt 5 (如果使用 Qt 5)
+sudo apt-get install qtbase5-dev qtwebengine5-dev qtmultimedia5-dev
 ```
+
+#### Fedora/RHEL/CentOS
+```bash
+# Qt 6
+sudo dnf install qt6-qtbase-devel qt6-qtwebengine-devel qt6-qtmultimedia-devel
+
+# 或 Qt 5
+sudo dnf install qt5-qtbase-devel qt5-qtwebengine-devel qt5-qtmultimedia-devel
+```
+
+#### macOS (使用 Homebrew)
+```bash
+brew install qt@6
+# 或 brew install qt@5
+```
+
+#### Windows
+1. 下載並安裝 Qt from [qt.io](https://www.qt.io/download)
+2. 在安裝時確保選擇以下組件：
+   - Qt WebEngine
+   - Qt Multimedia
+   - Qt Network
+
+### 驗證 Qt WebEngine 安裝
+
+安裝完成後，驗證 WebEngine 模組是否可用：
+
+```bash
+# Qt 6
+qmake6 -query | grep WebEngine
+
+# Qt 5
+qmake -query QT_INSTALL_LIBS
+ls $(qmake -query QT_INSTALL_LIBS) | grep WebEngine
+```
+
+如果找不到 WebEngine 相關檔案，請重新安裝 Qt WebEngine 模組。
 
 ### 設置 YouTube API Key
 在使用前，您需要獲取 YouTube Data API v3 的 API Key：
@@ -93,10 +147,27 @@ apiKey("YOUR_API_KEY_HERE")
 ```
 
 ### 編譯
+
+#### 使用 qmake (傳統方式)
 ```bash
+# Qt 6
 qmake6 last-report.pro
 make
+
+# Qt 5
+qmake last-report.pro
+make
 ```
+
+#### 使用 CMake (推薦)
+```bash
+mkdir build
+cd build
+cmake ..
+cmake --build .
+```
+
+**注意**: 如果遇到 "Unknown module(s) in QT: webenginewidgets" 錯誤，表示 Qt WebEngine 未正確安裝。請參考上面的安裝指令重新安裝。
 
 ### 運行
 ```bash
@@ -162,6 +233,31 @@ make
 - 添加播放歷史記錄
 - 支援深色/淺色主題切換
 - 實作迷你播放器模式
+
+## 疑難排解 (Troubleshooting)
+
+### 編譯錯誤: "Unknown module(s) in QT: webenginewidgets"
+
+這是最常見的錯誤，表示 Qt WebEngine 模組未安裝。
+
+**解決步驟**:
+1. 執行檢查腳本確認問題:
+   ```bash
+   ./check_webengine.sh        # Linux/macOS
+   check_webengine.bat          # Windows
+   ```
+
+2. 按照腳本提示安裝 Qt WebEngine
+
+3. 參考 [INSTALL.md](INSTALL.md) 獲取詳細說明
+
+### 其他常見問題
+
+- **找不到 qmake**: 確認 Qt 已正確安裝並加入 PATH
+- **CMake 找不到 Qt**: 設置 `CMAKE_PREFIX_PATH` 環境變數
+- **缺少 DLL (Windows)**: 將 Qt bin 目錄加入 PATH 或複製所需 DLL
+
+完整的疑難排解指南請參考 [INSTALL.md](INSTALL.md)。
 
 ## 授權聲明
 
