@@ -1,0 +1,86 @@
+========================================
+Qt WebEngineWidgets 錯誤解決方案
+========================================
+
+問題: "Unknown module(s) in QT: webenginewidgets"
+
+這個錯誤表示 Qt WebEngine 模組未安裝。本專案已提供完整的解決方案。
+
+========================================
+快速解決步驟
+========================================
+
+1. 檢查問題
+   Linux/macOS:  ./check_webengine.sh
+   Windows:      check_webengine.bat
+
+2. 安裝 Qt WebEngine
+   Ubuntu/Debian:
+   $ sudo apt-get install qt6-webengine-dev
+   
+   Fedora/RHEL:
+   $ sudo dnf install qt6-qtwebengine-devel
+   
+   macOS:
+   $ brew install qt@6
+   
+   Windows:
+   使用 Qt Maintenance Tool 安裝 WebEngine 組件
+
+3. 編譯專案
+   使用 CMake (推薦):
+   $ mkdir build && cd build
+   $ cmake ..
+   $ cmake --build .
+   
+   或使用 qmake:
+   $ qmake6 last-report.pro
+   $ make
+
+========================================
+新增的文件
+========================================
+
+1. CMakeLists.txt
+   - 現代化的建置系統
+   - 提供清晰的錯誤訊息
+   - 支援 Qt5 和 Qt6
+
+2. check_webengine.sh / .bat
+   - 自動檢查 Qt WebEngine 是否已安裝
+   - 提供針對性的安裝指令
+
+3. INSTALL.md
+   - 完整的安裝指南
+   - 涵蓋所有主流平台
+   - 詳細的疑難排解
+
+4. QUICK_REFERENCE.md
+   - 常用命令快速參考
+   - 編譯和除錯技巧
+
+5. README.md (更新)
+   - 添加快速開始部分
+   - 新增疑難排解章節
+   - 多平台安裝說明
+
+========================================
+為什麼選擇這個解決方案
+========================================
+
+✓ 自動化檢測: 腳本自動檢查並診斷問題
+✓ 清晰指引: 針對不同平台提供具體步驟
+✓ 多種建置方式: 支援 CMake 和 qmake
+✓ 完整文檔: 涵蓋從安裝到疑難排解
+✓ 向後兼容: 不影響現有的 .pro 檔案
+
+========================================
+獲取更多幫助
+========================================
+
+詳細說明請參考:
+- INSTALL.md - 完整安裝指南
+- QUICK_REFERENCE.md - 快速命令參考
+- README.md - 專案概覽和基本使用
+
+========================================
