@@ -69,15 +69,60 @@
 
 ### 系統需求
 - Qt 6.x 或更高版本
-- Qt WebEngine 模組
+- **Qt WebEngine 模組** (必須安裝)
 - Qt Network 模組
+- Qt Multimedia 模組
 - C++17 編譯器
 - 穩定的網路連線
 
-### 安裝依賴 (Ubuntu/Debian)
+### 安裝依賴
+
+#### Ubuntu/Debian
 ```bash
-sudo apt-get install qt6-base-dev qt6-webengine-dev
+# 安裝 Qt 6 和必要模組
+sudo apt-get update
+sudo apt-get install qt6-base-dev qt6-webengine-dev qt6-multimedia-dev
+
+# 或安裝 Qt 5 (如果使用 Qt 5)
+sudo apt-get install qtbase5-dev qtwebengine5-dev qtmultimedia5-dev
 ```
+
+#### Fedora/RHEL/CentOS
+```bash
+# Qt 6
+sudo dnf install qt6-qtbase-devel qt6-qtwebengine-devel qt6-qtmultimedia-devel
+
+# 或 Qt 5
+sudo dnf install qt5-qtbase-devel qt5-qtwebengine-devel qt5-qtmultimedia-devel
+```
+
+#### macOS (使用 Homebrew)
+```bash
+brew install qt@6
+# 或 brew install qt@5
+```
+
+#### Windows
+1. 下載並安裝 Qt from [qt.io](https://www.qt.io/download)
+2. 在安裝時確保選擇以下組件：
+   - Qt WebEngine
+   - Qt Multimedia
+   - Qt Network
+
+### 驗證 Qt WebEngine 安裝
+
+安裝完成後，驗證 WebEngine 模組是否可用：
+
+```bash
+# Qt 6
+qmake6 -query | grep WebEngine
+
+# Qt 5
+qmake -query QT_INSTALL_LIBS
+ls $(qmake -query QT_INSTALL_LIBS) | grep WebEngine
+```
+
+如果找不到 WebEngine 相關檔案，請重新安裝 Qt WebEngine 模組。
 
 ### 設置 YouTube API Key
 在使用前，您需要獲取 YouTube Data API v3 的 API Key：
@@ -93,10 +138,27 @@ apiKey("YOUR_API_KEY_HERE")
 ```
 
 ### 編譯
+
+#### 使用 qmake (傳統方式)
 ```bash
+# Qt 6
 qmake6 last-report.pro
 make
+
+# Qt 5
+qmake last-report.pro
+make
 ```
+
+#### 使用 CMake (推薦)
+```bash
+mkdir build
+cd build
+cmake ..
+cmake --build .
+```
+
+**注意**: 如果遇到 "Unknown module(s) in QT: webenginewidgets" 錯誤，表示 Qt WebEngine 未正確安裝。請參考上面的安裝指令重新安裝。
 
 ### 運行
 ```bash
