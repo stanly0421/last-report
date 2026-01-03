@@ -21,8 +21,6 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
-#include <QWebEngineView>
-
 QT_BEGIN_NAMESPACE
 namespace Ui {
 class Widget;
@@ -91,6 +89,7 @@ private:
     QList<int> getUnplayedVideoIndices(bool excludeCurrent = true);
     void searchYouTube(const QString& query);
     void showSearchResults(const QJsonArray& items);
+    QString createVideoDisplayHTML(const VideoInfo& video);
 
     Ui::Widget *ui;
     
@@ -99,8 +98,8 @@ private:
     QString apiKey;
     QList<VideoInfo> searchResults;
     
-    // 網頁播放器
-    QWebEngineView* webEngineView;
+    // 影片資訊顯示區域
+    QLabel* videoDisplayLabel;
     
     // UI 元件
     QLineEdit* searchEdit;
