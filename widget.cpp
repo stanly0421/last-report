@@ -585,10 +585,18 @@ void Widget::onMediaPlayerStateChanged()
         isPlaying = false;
         playPauseButton->setText("▶");
         
-        // 如果到達結尾，自動播放下一首
-        int nextIndex = getNextVideoIndex();
-        if (nextIndex >= 0) {
-            playVideo(nextIndex);
+        // 本地檔案播放結束，自動播放下一首（如果有）
+        // 只有當前正在播放本地檔案時才自動播放下一首
+        if (currentVideoIndex >= 0 && currentPlaylistIndex >= 0 && 
+            currentPlaylistIndex < playlists.size()) {
+            const Playlist& playlist = playlists[currentPlaylistIndex];
+            if (currentVideoIndex < playlist.videos.size() &&
+                playlist.videos[currentVideoIndex].isLocalFile) {
+                int nextIndex = getNextVideoIndex();
+                if (nextIndex >= 0) {
+                    playVideo(nextIndex);
+                }
+            }
         }
     }
 }
@@ -895,16 +903,18 @@ void Widget::playVideo(int index)
         ).arg(video.title.toHtmlEscaped()).arg(fileInfo.fileName().toHtmlEscaped());
         
         videoDisplayLabel->setText(displayHTML);
+        isPlaying = true;
+        playPauseButton->setText("⏸");
     } else {
-        // 顯示 YouTube 影片資訊
+        // 顯示 YouTube 影片資訊（不自動播放）
         videoDisplayLabel->setText(createVideoDisplayHTML(video));
+        isPlaying = false;
+        playPauseButton->setText("▶");
     }
     
     // 更新顯示
     videoTitleLabel->setText(video.title);
     channelLabel->setText(video.channelTitle);
-    isPlaying = true;
-    playPauseButton->setText("⏸");
     
     // 更新最愛按鈕
     if (video.isFavorite) {
