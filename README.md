@@ -1,35 +1,37 @@
-# YouTube 音樂播放器 (YouTube Music Player)
+# 音樂播放器 (Music Player)
 
-這是一個使用 Qt6 C++ 開發的 YouTube 音樂播放器，靈感來自 Spotify 的設計風格。
+這是一個使用 Qt6 C++ 開發的音樂播放器，靈感來自 Spotify 的設計風格。支援本地音樂檔案播放和 YouTube 影片連結。
 
 ## 快速開始
 
 1. **編譯**: 使用 CMake 或 qmake (詳見下方說明)
-2. **設置 API Key**: 在 `widget.cpp` 中設置您的 YouTube API key
+2. **使用**: 貼上 YouTube 連結或選擇本地音樂檔案開始播放
 
 ## 功能特色
 
-### 1. YouTube 影片搜尋
-- 使用 YouTube Data API v3 搜尋影片
-- 顯示搜尋結果包含影片標題、頻道名稱
-- 支援關鍵字搜尋音樂和影片
-- 即時顯示最多 20 筆搜尋結果
+### 1. YouTube 影片播放
+- 支援貼上 YouTube 連結直接播放
+- 支援多種 YouTube URL 格式
+  - https://www.youtube.com/watch?v=VIDEO_ID
+  - https://youtu.be/VIDEO_ID
+  - https://www.youtube.com/embed/VIDEO_ID
+- 在瀏覽器中開啟影片連結
 
-### 2. 影片資訊顯示
-- 顯示 YouTube 影片資訊
-- 提供連結在瀏覽器中播放
-- 自動生成 YouTube 觀看連結
-- 簡潔的資訊展示介面
+### 2. 本地音樂播放
+- 支援多種音樂格式：MP3、WAV、FLAC、M4A、OGG、AAC
+- 使用檔案對話框選擇音樂檔案
+- 內建音樂播放器，支援播放/暫停控制
+- 自動顯示歌曲名稱（從檔案名提取）
 
 ### 3. 播放清單管理
 - 創建和管理多個播放清單
-- 從搜尋結果添加影片到播放清單
-- 支援刪除播放清單中的影片
+- 儲存 YouTube 連結和本地音樂到播放清單
+- 支援從播放清單播放音樂
 - 雙擊播放清單項目即可播放
 - 拖放排序功能
 
 ### 4. 播放控制
-- 播放/暫停按鈕
+- 播放/暫停按鈕（本地音樂支援實際控制）
 - 上一首/下一首功能
 - 隨機播放模式
 - 循環播放模式
@@ -38,7 +40,7 @@
 ### 5. 我的最愛功能
 - 一鍵加入/移除最愛
 - 自動創建「我的最愛」播放清單
-- 快速訪問喜愛的影片
+- 快速訪問喜愛的音樂
 
 ### 6. Spotify 風格 UI
 - 深色主題設計
@@ -49,35 +51,38 @@
 
 ## 操作說明
 
-### 搜尋影片
-1. 在頂部搜尋欄輸入關鍵字
-2. 點擊「🔍 搜尋」按鈕或按 Enter
-3. 在搜尋結果中雙擊影片即可播放
-4. 選擇影片後點擊「➕ 加入」將其添加到當前播放清單
+### 播放 YouTube 影片
+1. 複製 YouTube 影片連結
+2. 在頂部搜尋欄貼上連結
+3. 點擊「▶ 播放」按鈕
+4. 在顯示區域點擊連結，在瀏覽器中觀看影片
+
+### 播放本地音樂
+1. 點擊頂部的「📁 本地音樂」按鈕
+2. 選擇音樂檔案
+3. 音樂將自動開始播放
+4. 使用播放控制按鈕控制播放
 
 ### 播放控制
-- **▶ 播放/⏸ 暫停**: 開始或暫停播放當前影片
-- **⏮ 上一首**: 切換到上一首影片
-- **⏭ 下一首**: 切換到下一首影片
+- **▶ 播放/⏸ 暫停**: 開始或暫停播放當前音樂（僅本地音樂支援）
+- **⏮ 上一首**: 切換到上一首音樂
+- **⏭ 下一首**: 切換到下一首音樂
 - **🔀 隨機**: 啟用隨機播放模式
 - **🔁 循環**: 啟用循環播放模式
-- **❤️ 加入最愛**: 將當前影片加入最愛
+- **❤️ 加入最愛**: 將當前音樂加入最愛
 
 ### 播放清單管理
 - **➕ 新增**: 創建新的播放清單
 - **🗑️ 刪除**: 刪除當前播放清單（至少保留一個）
-- **➕ 加入**: 將選中的搜尋結果加入播放清單
-- **➖ 移除**: 從播放清單移除選中的影片
-- **雙擊影片**: 立即播放該影片
+- **雙擊音樂**: 立即播放該音樂
 
 ## 編譯和運行
 
 ### 系統需求
 - Qt 6.x 或更高版本
-- Qt Network 模組
 - Qt Multimedia 模組
 - C++17 編譯器
-- 穩定的網路連線
+- 穩定的網路連線（播放 YouTube 影片時）
 
 ### 安裝依賴
 
@@ -110,22 +115,6 @@ brew install qt@6
 1. 下載並安裝 Qt from [qt.io](https://www.qt.io/download)
 2. 在安裝時確保選擇以下組件：
    - Qt Multimedia
-   - Qt Network
-
-### 編譯
-
-#### 使用 qmake (傳統方式)
-在使用前，您需要獲取 YouTube Data API v3 的 API Key：
-
-1. 前往 [Google Cloud Console](https://console.cloud.google.com/)
-2. 創建新專案或選擇現有專案
-3. 啟用 YouTube Data API v3
-4. 創建憑證（API Key）
-5. 在 `widget.cpp` 中替換 `apiKey` 變數的值
-
-```cpp
-apiKey("YOUR_API_KEY_HERE")
-```
 
 ### 編譯
 
@@ -156,73 +145,69 @@ cmake --build .
 ## 技術實現
 
 ### 核心類別
-- **QLabel**: 影片資訊顯示區域
-- **QNetworkAccessManager**: YouTube API 網路請求
-- **QJsonDocument**: 解析 API 回應
-- **QListWidget**: 顯示搜尋結果和播放清單
+- **QMediaPlayer**: 本地音樂播放器
+- **QAudioOutput**: 音訊輸出控制
+- **QFileDialog**: 檔案選擇對話框
+- **QListWidget**: 顯示播放清單
 - **QComboBox**: 播放清單選擇器
+- **QRegularExpression**: YouTube 連結解析
 
-### YouTube API 整合
-- 使用 YouTube Data API v3 的 search endpoint
-- 搜尋參數：`type=video`, `maxResults=20`
-- 回傳影片資訊：videoId, title, channelTitle, thumbnails
-- 使用標準 URL 格式：`https://www.youtube.com/watch?v={videoId}`
+### YouTube 連結處理
+- 使用正則表達式解析 YouTube URL
+- 支援多種 URL 格式
+- 生成標準觀看連結
+
+### 本地音樂播放
+- 使用 Qt Multimedia 框架
+- 支援多種音訊格式
+- 即時播放控制
 
 ### 資料持久化
 - 使用 JSON 格式儲存播放清單
 - 儲存位置：`QStandardPaths::AppDataLocation`
 - 自動載入上次的播放清單
-- 保存影片資訊和最愛狀態
+- 保存音樂資訊、檔案路徑和最愛狀態
 
 ## 界面預覽
 
 播放器界面包含：
-- **頂部搜尋欄**: Logo 和搜尋功能
+- **頂部搜尋欄**: Logo、YouTube 連結輸入框和本地音樂按鈕
 - **左側面板**: 播放清單管理
 - **中央面板**: 
-  - 影片資訊顯示
-  - 影片連結顯示區域
+  - 音樂資訊顯示
+  - 連結顯示區域（YouTube 影片）
   - 播放控制按鈕
-  - 搜尋結果列表
 
 ## 注意事項
 
-### API 配額限制
-- YouTube Data API 有每日配額限制
-- 預設配額：10,000 單位/天
-- search 操作消耗：100 單位/次
-- 建議合理使用，避免頻繁搜尋
-
-### 網路連線
+### YouTube 影片播放
+- YouTube 影片在瀏覽器中播放
 - 需要穩定的網路連線
-- 影片播放需要足夠的頻寬
-- 建議使用 Wi-Fi 或高速網路
+- 不需要 YouTube API Key
 
-### 背景播放
-- 影片在瀏覽器中播放
-- 可以在應用程式中管理播放清單
-- 透過連結開啟瀏覽器播放影片
+### 本地音樂播放
+- 支援常見音訊格式
+- 檔案路徑會被儲存在播放清單中
+- 確保音樂檔案位置不會移動
 
 ## 未來改進
 
 - 支援播放清單分享功能
-- 添加影片品質選擇
-- 支援歌詞顯示（如果有）
-- 實作真正的背景播放（純音訊）
+- 添加音量控制滑桿
+- 支援播放進度條
 - 添加播放歷史記錄
 - 支援深色/淺色主題切換
 - 實作迷你播放器模式
+- 支援更多音訊格式
+- 添加等化器功能
 
 ## 疑難排解 (Troubleshooting)
 
-### 其他常見問題
+### 常見問題
 
 - **找不到 qmake**: 確認 Qt 已正確安裝並加入 PATH
 - **CMake 找不到 Qt**: 設置 `CMAKE_PREFIX_PATH` 環境變數
 - **缺少 DLL (Windows)**: 將 Qt bin 目錄加入 PATH 或複製所需 DLL
-
-## 授權聲明
-
-本專案使用 YouTube API 服務，必須遵守 [YouTube API 服務條款](https://developers.google.com/youtube/terms/api-services-terms-of-service)。
+- **本地音樂無法播放**: 確認 Qt Multimedia 模組已正確安裝
 
 祝您使用愉快！🎵

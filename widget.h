@@ -16,8 +16,9 @@
 #include <QMap>
 #include <QList>
 #include <QSet>
-#include <QNetworkAccessManager>
-#include <QNetworkReply>
+#include <QMediaPlayer>
+#include <QAudioOutput>
+#include <QFileDialog>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
@@ -27,14 +28,16 @@ class Widget;
 }
 QT_END_NAMESPACE
 
-// 影片資訊結構
+// 影片/音樂資訊結構
 struct VideoInfo {
-    QString videoId;          // YouTube 影片 ID
-    QString title;            // 影片標題
-    QString channelTitle;     // 頻道名稱
+    QString videoId;          // YouTube 影片 ID (用於 YouTube 連結)
+    QString filePath;         // 本地檔案路徑 (用於本地音樂)
+    QString title;            // 影片/音樂標題
+    QString channelTitle;     // 頻道名稱/藝術家
     QString thumbnailUrl;     // 縮圖 URL
     QString description;      // 描述
-    bool isFavorite;          // 是否為喜愛的影片
+    bool isFavorite;          // 是否為喜愛的影片/音樂
+    bool isLocalFile;         // 是否為本地檔案
 };
 
 // 播放清單結構
@@ -61,10 +64,9 @@ private slots:
     
     // 搜尋功能
     void onSearchClicked();
+    void onLoadLocalFileClicked();
     
     // 播放清單管理
-    void onAddToPlaylistClicked();
-    void onRemoveVideoClicked();
     void onVideoDoubleClicked(QListWidgetItem* item);
     void onToggleFavoriteClicked();
     
@@ -73,8 +75,10 @@ private slots:
     void onDeletePlaylistClicked();
     void onPlaylistChanged(int index);
     
-    // 網路請求
-    void onNetworkReplyFinished(QNetworkReply* reply);
+    // 媒體播放器
+    void onMediaPlayerStateChanged();
+    void onMediaPlayerPositionChanged(qint64 position);
+    void onMediaPlayerDurationChanged(qint64 duration);
 
 private:
     void setupUI();
@@ -87,16 +91,16 @@ private:
     int getNextVideoIndex();
     int getRandomVideoIndex(bool excludeCurrent = true);
     QList<int> getUnplayedVideoIndices(bool excludeCurrent = true);
-    void searchYouTube(const QString& query);
-    void showSearchResults(const QJsonArray& items);
+    void playYouTubeLink(const QString& link);
+    void playLocalFile(const QString& filePath);
+    QString extractYouTubeVideoId(const QString& url);
     QString createVideoDisplayHTML(const VideoInfo& video);
 
     Ui::Widget *ui;
     
-    // YouTube API
-    QNetworkAccessManager* networkManager;
-    QString apiKey;
-    QList<VideoInfo> searchResults;
+    // 媒體播放器
+    QMediaPlayer* mediaPlayer;
+    QAudioOutput* audioOutput;
     
     // 影片資訊顯示區域
     QLabel* videoDisplayLabel;
@@ -104,7 +108,7 @@ private:
     // UI 元件
     QLineEdit* searchEdit;
     QPushButton* searchButton;
-    QListWidget* searchResultsWidget;
+    QPushButton* loadLocalFileButton;
     QLabel* videoTitleLabel;
     QLabel* channelLabel;
     QPushButton* playPauseButton;
@@ -112,8 +116,6 @@ private:
     QPushButton* nextButton;
     QPushButton* shuffleButton;
     QPushButton* repeatButton;
-    QPushButton* addToPlaylistButton;
-    QPushButton* removeVideoButton;
     QPushButton* toggleFavoriteButton;
     QPushButton* newPlaylistButton;
     QPushButton* deletePlaylistButton;
