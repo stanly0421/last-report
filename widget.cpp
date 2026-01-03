@@ -466,7 +466,7 @@ void Widget::playYouTubeLink(const QString& link)
     QString videoId = extractYouTubeVideoId(link);
     
     if (videoId.isEmpty()) {
-        QMessageBox::warning(this, "錯誤", "無法識別 YouTube 連結格式！\n\n支援的格式：\n- https://www.youtube.com/watch?v=VIDEO_ID\n- https://youtu.be/VIDEO_ID");
+        QMessageBox::warning(this, "錯誤", "無法識別 YouTube 連結格式！\n\n支援的格式：\n- https://www.youtube.com/watch?v=VIDEO_ID\n- https://youtu.be/VIDEO_ID\n- https://www.youtube.com/embed/VIDEO_ID");
         return;
     }
     
@@ -585,12 +585,10 @@ void Widget::onMediaPlayerStateChanged()
         isPlaying = false;
         playPauseButton->setText("▶");
         
-        // 如果開啟循環或隨機播放，自動播放下一首
-        if (isRepeatMode || isShuffleMode) {
-            int nextIndex = getNextVideoIndex();
-            if (nextIndex >= 0) {
-                playVideo(nextIndex);
-            }
+        // 如果到達結尾，自動播放下一首
+        int nextIndex = getNextVideoIndex();
+        if (nextIndex >= 0) {
+            playVideo(nextIndex);
         }
     }
 }
@@ -927,13 +925,13 @@ void Widget::updateButtonStates()
     bool hasVideos = hasPlaylist && !playlists[currentPlaylistIndex].videos.isEmpty();
     int selectedRow = playlistWidget->currentRow();
     bool hasSelection = selectedRow >= 0;
-    bool hasVideoPlaying = currentVideoIndex >= 0;
+    bool hasMediaPlaying = currentVideoIndex >= 0;
     
-    playPauseButton->setEnabled(hasVideos || hasVideoPlaying);
+    playPauseButton->setEnabled(hasVideos || hasMediaPlaying);
     previousButton->setEnabled(hasVideos);
     nextButton->setEnabled(hasVideos);
     deletePlaylistButton->setEnabled(playlists.size() > 1);
-    toggleFavoriteButton->setEnabled(hasVideoPlaying);
+    toggleFavoriteButton->setEnabled(hasMediaPlaying);
 }
 
 void Widget::savePlaylistsToFile()

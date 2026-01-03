@@ -67,8 +67,6 @@ private slots:
     void onLoadLocalFileClicked();
     
     // 播放清單管理
-    void onAddToPlaylistClicked();
-    void onRemoveVideoClicked();
     void onVideoDoubleClicked(QListWidgetItem* item);
     void onToggleFavoriteClicked();
     
