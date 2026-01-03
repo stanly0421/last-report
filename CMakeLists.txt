@@ -20,37 +20,6 @@ find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS
     Network
 )
 
-# Try to find WebEngineWidgets
-find_package(Qt${QT_VERSION_MAJOR} COMPONENTS WebEngineWidgets QUIET)
-
-if(NOT Qt${QT_VERSION_MAJOR}WebEngineWidgets_FOUND)
-    message(FATAL_ERROR 
-        "\n"
-        "========================================\n"
-        "ERROR: Qt WebEngineWidgets module not found!\n"
-        "========================================\n"
-        "\n"
-        "This application requires Qt WebEngine to display embedded YouTube videos.\n"
-        "\n"
-        "To install Qt WebEngine:\n"
-        "\n"
-        "Ubuntu/Debian:\n"
-        "  sudo apt-get install qt${QT_VERSION_MAJOR}-webengine-dev\n"
-        "\n"
-        "Fedora/RHEL:\n"
-        "  sudo dnf install qt${QT_VERSION_MAJOR}-qtwebengine-devel\n"
-        "\n"
-        "macOS (Homebrew):\n"
-        "  brew install qt@${QT_VERSION_MAJOR}\n"
-        "\n"
-        "Windows:\n"
-        "  Install Qt WebEngine via Qt Maintenance Tool or download from qt.io\n"
-        "\n"
-        "After installation, try building again.\n"
-        "========================================\n"
-    )
-endif()
-
 set(PROJECT_SOURCES
     main.cpp
     widget.cpp
@@ -76,7 +45,6 @@ target_link_libraries(last-report PRIVATE
     Qt${QT_VERSION_MAJOR}::Multimedia
     Qt${QT_VERSION_MAJOR}::MultimediaWidgets
     Qt${QT_VERSION_MAJOR}::Network
-    Qt${QT_VERSION_MAJOR}::WebEngineWidgets
 )
 
 # Set target properties
