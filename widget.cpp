@@ -1085,6 +1085,9 @@ QList<int> Widget::getUnplayedVideoIndices(bool excludeCurrent)
 QString Widget::createVideoDisplayHTML(const VideoInfo& video)
 {
     QString watchUrl = QString("https://www.youtube.com/watch?v=%1").arg(video.videoId);
+    QString escapedTitle = video.title.toHtmlEscaped();
+    QString escapedChannel = video.channelTitle.toHtmlEscaped();
+    
     return QString(
         "<div style='text-align: center;'>"
         "<h2 style='color: #1DB954;'>🎵 YouTube 影片</h2>"
@@ -1093,5 +1096,5 @@ QString Widget::createVideoDisplayHTML(const VideoInfo& video)
         "<p style='margin: 30px 0;'><a href='%3' style='color: #1DB954; text-decoration: none; font-size: 16px;'>🔗 在瀏覽器中播放</a></p>"
         "<p style='color: #666; font-size: 12px;'>點擊上方連結在您的瀏覽器中觀看此影片</p>"
         "</div>"
-    ).arg(video.title).arg(video.channelTitle).arg(watchUrl);
+    ).arg(escapedTitle).arg(escapedChannel).arg(watchUrl);
 }
