@@ -89,6 +89,7 @@ private:
     QList<int> getUnplayedVideoIndices(bool excludeCurrent = true);
     void searchYouTube(const QString& query);
     void showSearchResults(const QJsonArray& items);
+    QString createVideoDisplayHTML(const VideoInfo& video);
 
     Ui::Widget *ui;
     

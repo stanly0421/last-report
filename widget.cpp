@@ -422,17 +422,7 @@ void Widget::createConnections()
             VideoInfo video = searchResults[index];
             currentVideoIndex = -1;  // 不屬於播放清單
             
-            QString watchUrl = QString("https://www.youtube.com/watch?v=%1").arg(video.videoId);
-            QString displayText = QString(
-                "<div style='text-align: center;'>"
-                "<h2 style='color: #1DB954;'>🎵 YouTube 影片</h2>"
-                "<p style='font-size: 18px; margin: 20px 0;'>%1</p>"
-                "<p style='font-size: 14px; color: #888; margin: 10px 0;'>頻道: %2</p>"
-                "<p style='margin: 30px 0;'><a href='%3' style='color: #1DB954; text-decoration: none; font-size: 16px;'>🔗 在瀏覽器中播放</a></p>"
-                "<p style='color: #666; font-size: 12px;'>點擊上方連結在您的瀏覽器中觀看此影片</p>"
-                "</div>"
-            ).arg(video.title).arg(video.channelTitle).arg(watchUrl);
-            videoDisplayLabel->setText(displayText);
+            videoDisplayLabel->setText(createVideoDisplayHTML(video));
             
             videoTitleLabel->setText(video.title);
             channelLabel->setText(video.channelTitle);
@@ -890,17 +880,7 @@ void Widget::playVideo(int index)
     playedVideosInCurrentSession.insert(index);
     
     // 顯示影片資訊和連結
-    QString watchUrl = QString("https://www.youtube.com/watch?v=%1").arg(video.videoId);
-    QString displayText = QString(
-        "<div style='text-align: center;'>"
-        "<h2 style='color: #1DB954;'>🎵 YouTube 影片</h2>"
-        "<p style='font-size: 18px; margin: 20px 0;'>%1</p>"
-        "<p style='font-size: 14px; color: #888; margin: 10px 0;'>頻道: %2</p>"
-        "<p style='margin: 30px 0;'><a href='%3' style='color: #1DB954; text-decoration: none; font-size: 16px;'>🔗 在瀏覽器中播放</a></p>"
-        "<p style='color: #666; font-size: 12px;'>點擊上方連結在您的瀏覽器中觀看此影片</p>"
-        "</div>"
-    ).arg(video.title).arg(video.channelTitle).arg(watchUrl);
-    videoDisplayLabel->setText(displayText);
+    videoDisplayLabel->setText(createVideoDisplayHTML(video));
     
     // 更新顯示
     videoTitleLabel->setText(video.title);
@@ -1100,4 +1080,18 @@ QList<int> Widget::getUnplayedVideoIndices(bool excludeCurrent)
     }
     
     return unplayedVideos;
+}
+
+QString Widget::createVideoDisplayHTML(const VideoInfo& video)
+{
+    QString watchUrl = QString("https://www.youtube.com/watch?v=%1").arg(video.videoId);
+    return QString(
+        "<div style='text-align: center;'>"
+        "<h2 style='color: #1DB954;'>🎵 YouTube 影片</h2>"
+        "<p style='font-size: 18px; margin: 20px 0;'>%1</p>"
+        "<p style='font-size: 14px; color: #888; margin: 10px 0;'>頻道: %2</p>"
+        "<p style='margin: 30px 0;'><a href='%3' style='color: #1DB954; text-decoration: none; font-size: 16px;'>🔗 在瀏覽器中播放</a></p>"
+        "<p style='color: #666; font-size: 12px;'>點擊上方連結在您的瀏覽器中觀看此影片</p>"
+        "</div>"
+    ).arg(video.title).arg(video.channelTitle).arg(watchUrl);
 }
