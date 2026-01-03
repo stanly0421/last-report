@@ -21,8 +21,6 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
-#include <QWebEngineView>
-
 QT_BEGIN_NAMESPACE
 namespace Ui {
 class Widget;
@@ -99,8 +97,8 @@ private:
     QString apiKey;
     QList<VideoInfo> searchResults;
     
-    // 網頁播放器
-    QWebEngineView* webEngineView;
+    // 影片資訊顯示區域
+    QLabel* videoDisplayLabel;
     
     // UI 元件
     QLineEdit* searchEdit;

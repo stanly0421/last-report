@@ -281,11 +281,21 @@ void Widget::setupUI()
     channelLabel->setStyleSheet("font-size: 14px; color: #B3B3B3;");
     centerLayout->addWidget(channelLabel);
     
-    // 影片播放器
-    webEngineView = new QWebEngineView(centerPanel);
-    webEngineView->setMinimumHeight(400);
-    webEngineView->setStyleSheet("background-color: #000000;");
-    centerLayout->addWidget(webEngineView, 1);
+    // 影片資訊顯示區域
+    videoDisplayLabel = new QLabel("", centerPanel);
+    videoDisplayLabel->setMinimumHeight(400);
+    videoDisplayLabel->setStyleSheet(
+        "background-color: #000000;"
+        "color: #B3B3B3;"
+        "font-size: 16px;"
+        "padding: 20px;"
+        "border-radius: 8px;"
+    );
+    videoDisplayLabel->setAlignment(Qt::AlignCenter);
+    videoDisplayLabel->setWordWrap(true);
+    videoDisplayLabel->setTextFormat(Qt::RichText);
+    videoDisplayLabel->setOpenExternalLinks(true);
+    centerLayout->addWidget(videoDisplayLabel, 1);
     
     // 播放控制區域
     QWidget* controlWidget = new QWidget(centerPanel);
@@ -412,8 +422,17 @@ void Widget::createConnections()
             VideoInfo video = searchResults[index];
             currentVideoIndex = -1;  // 不屬於播放清單
             
-            QString embedUrl = QString("https://www.youtube.com/embed/%1?autoplay=1").arg(video.videoId);
-            webEngineView->setUrl(QUrl(embedUrl));
+            QString watchUrl = QString("https://www.youtube.com/watch?v=%1").arg(video.videoId);
+            QString displayText = QString(
+                "<div style='text-align: center;'>"
+                "<h2 style='color: #1DB954;'>🎵 YouTube 影片</h2>"
+                "<p style='font-size: 18px; margin: 20px 0;'>%1</p>"
+                "<p style='font-size: 14px; color: #888; margin: 10px 0;'>頻道: %2</p>"
+                "<p style='margin: 30px 0;'><a href='%3' style='color: #1DB954; text-decoration: none; font-size: 16px;'>🔗 在瀏覽器中播放</a></p>"
+                "<p style='color: #666; font-size: 12px;'>點擊上方連結在您的瀏覽器中觀看此影片</p>"
+                "</div>"
+            ).arg(video.title).arg(video.channelTitle).arg(watchUrl);
+            videoDisplayLabel->setText(displayText);
             
             videoTitleLabel->setText(video.title);
             channelLabel->setText(video.channelTitle);
@@ -526,9 +545,8 @@ void Widget::onPlayPauseClicked()
         isPlaying = !isPlaying;
         playPauseButton->setText(isPlaying ? "⏸" : "▶");
         
-        // 注意：完整的播放/暫停控制需要通過 JavaScript 與 YouTube iframe API 互動
-        // 目前實作為簡化版本，實際播放控制由 YouTube 嵌入播放器處理
-        // 未來可以通過 QWebEngineView::page()->runJavaScript() 實現完整控制
+        // 注意：影片播放控制由瀏覽器處理
+        // 使用者需要點擊連結在瀏覽器中播放影片
     } else {
         // 沒有影片，播放播放清單第一首
         if (currentPlaylistIndex >= 0 && currentPlaylistIndex < playlists.size()) {
@@ -688,7 +706,7 @@ void Widget::onRemoveVideoClicked()
     Playlist& playlist = playlists[currentPlaylistIndex];
     if (selectedRow < playlist.videos.size()) {
         if (selectedRow == currentVideoIndex) {
-            webEngineView->setUrl(QUrl("about:blank"));
+            videoDisplayLabel->clear();
             currentVideoIndex = -1;
             isPlaying = false;
         } else if (selectedRow < currentVideoIndex) {
@@ -810,7 +828,7 @@ void Widget::onDeletePlaylistClicked()
                                     .arg(playlists[currentPlaylistIndex].name),
                                     QMessageBox::Yes | QMessageBox::No);
     if (ret == QMessageBox::Yes) {
-        webEngineView->setUrl(QUrl("about:blank"));
+        videoDisplayLabel->clear();
         currentVideoIndex = -1;
         isPlaying = false;
         playlists.removeAt(currentPlaylistIndex);
@@ -871,9 +889,18 @@ void Widget::playVideo(int index)
     
     playedVideosInCurrentSession.insert(index);
     
-    // 載入 YouTube 嵌入播放器
-    QString embedUrl = QString("https://www.youtube.com/embed/%1?autoplay=1").arg(video.videoId);
-    webEngineView->setUrl(QUrl(embedUrl));
+    // 顯示影片資訊和連結
+    QString watchUrl = QString("https://www.youtube.com/watch?v=%1").arg(video.videoId);
+    QString displayText = QString(
+        "<div style='text-align: center;'>"
+        "<h2 style='color: #1DB954;'>🎵 YouTube 影片</h2>"
+        "<p style='font-size: 18px; margin: 20px 0;'>%1</p>"
+        "<p style='font-size: 14px; color: #888; margin: 10px 0;'>頻道: %2</p>"
+        "<p style='margin: 30px 0;'><a href='%3' style='color: #1DB954; text-decoration: none; font-size: 16px;'>🔗 在瀏覽器中播放</a></p>"
+        "<p style='color: #666; font-size: 12px;'>點擊上方連結在您的瀏覽器中觀看此影片</p>"
+        "</div>"
+    ).arg(video.title).arg(video.channelTitle).arg(watchUrl);
+    videoDisplayLabel->setText(displayText);
     
     // 更新顯示
     videoTitleLabel->setText(video.title);
