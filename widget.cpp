@@ -5,16 +5,18 @@
 #include <QGridLayout>
 #include <QGroupBox>
 #include <QFile>
+#include <QFileInfo>
 #include <QDir>
 #include <QRandomGenerator>
 #include <QStandardPaths>
 #include <QSplitter>
+#include <QRegularExpression>
 
 Widget::Widget(QWidget *parent)
     : QWidget(parent)
     , ui(new Ui::Widget)
-    , networkManager(new QNetworkAccessManager(this))
-    , apiKey("YOUR_YOUTUBE_API_KEY_HERE")  // 請使用 setup_api_key.sh 或 setup_api_key.bat 設置您的 API Key
+    , mediaPlayer(new QMediaPlayer(this))
+    , audioOutput(new QAudioOutput(this))
     , currentPlaylistIndex(-1)
     , currentVideoIndex(-1)
     , isShuffleMode(false)
@@ -23,8 +25,12 @@ Widget::Widget(QWidget *parent)
 {
     ui->setupUi(this);
     
+    // 設置媒體播放器
+    mediaPlayer->setAudioOutput(audioOutput);
+    audioOutput->setVolume(0.5);
+    
     // 設置窗口
-    setWindowTitle("YouTube 音樂播放器");
+    setWindowTitle("音樂播放器");
     setMinimumSize(1000, 700);
     
     // 建立UI
@@ -144,18 +150,18 @@ void Widget::setupUI()
     topBar->setStyleSheet("background-color: #000000; padding: 16px;");
     QHBoxLayout* topLayout = new QHBoxLayout(topBar);
     
-    QLabel* logoLabel = new QLabel("🎵 YouTube Player", topBar);
+    QLabel* logoLabel = new QLabel("🎵 音樂播放器", topBar);
     logoLabel->setStyleSheet("font-size: 20px; font-weight: bold; color: #1DB954;");
     topLayout->addWidget(logoLabel);
     
     topLayout->addStretch();
     
     searchEdit = new QLineEdit(topBar);
-    searchEdit->setPlaceholderText("搜尋歌曲或影片...");
+    searchEdit->setPlaceholderText("貼上 YouTube 連結...");
     searchEdit->setMinimumWidth(400);
     topLayout->addWidget(searchEdit);
     
-    searchButton = new QPushButton("🔍 搜尋", topBar);
+    searchButton = new QPushButton("▶ 播放", topBar);
     searchButton->setStyleSheet(
         "QPushButton {"
         "   background-color: #1DB954;"
@@ -170,6 +176,22 @@ void Widget::setupUI()
         "QPushButton:pressed { background-color: #1AA34A; }"
     );
     topLayout->addWidget(searchButton);
+    
+    loadLocalFileButton = new QPushButton("📁 本地音樂", topBar);
+    loadLocalFileButton->setStyleSheet(
+        "QPushButton {"
+        "   background-color: #282828;"
+        "   color: white;"
+        "   border: none;"
+        "   border-radius: 20px;"
+        "   padding: 8px 24px;"
+        "   font-size: 14px;"
+        "   font-weight: bold;"
+        "}"
+        "QPushButton:hover { background-color: #404040; }"
+        "QPushButton:pressed { background-color: #505050; }"
+    );
+    topLayout->addWidget(loadLocalFileButton);
     
     mainLayout->addWidget(topBar);
     
@@ -227,40 +249,6 @@ void Widget::setupUI()
     
     playlistWidget = new QListWidget(leftPanel);
     leftLayout->addWidget(playlistWidget);
-    
-    QHBoxLayout* videoButtonLayout = new QHBoxLayout();
-    
-    addToPlaylistButton = new QPushButton("➕ 加入", leftPanel);
-    addToPlaylistButton->setStyleSheet(
-        "QPushButton {"
-        "   background-color: #282828;"
-        "   color: #B3B3B3;"
-        "   border: none;"
-        "   border-radius: 4px;"
-        "   padding: 6px 12px;"
-        "   font-size: 12px;"
-        "}"
-        "QPushButton:hover { background-color: #404040; color: #FFFFFF; }"
-        "QPushButton:disabled { background-color: #181818; color: #404040; }"
-    );
-    videoButtonLayout->addWidget(addToPlaylistButton);
-    
-    removeVideoButton = new QPushButton("➖ 移除", leftPanel);
-    removeVideoButton->setStyleSheet(
-        "QPushButton {"
-        "   background-color: #282828;"
-        "   color: #B3B3B3;"
-        "   border: none;"
-        "   border-radius: 4px;"
-        "   padding: 6px 12px;"
-        "   font-size: 12px;"
-        "}"
-        "QPushButton:hover { background-color: #404040; color: #FFFFFF; }"
-        "QPushButton:disabled { background-color: #181818; color: #404040; }"
-    );
-    videoButtonLayout->addWidget(removeVideoButton);
-    
-    leftLayout->addLayout(videoButtonLayout);
     
     contentSplitter->addWidget(leftPanel);
     
@@ -377,15 +365,6 @@ void Widget::setupUI()
     
     centerLayout->addWidget(controlWidget);
     
-    // 搜尋結果
-    QLabel* searchResultLabel = new QLabel("搜尋結果", centerPanel);
-    searchResultLabel->setStyleSheet("font-size: 16px; font-weight: bold; color: #FFFFFF; margin-top: 16px;");
-    centerLayout->addWidget(searchResultLabel);
-    
-    searchResultsWidget = new QListWidget(centerPanel);
-    searchResultsWidget->setMinimumHeight(200);
-    centerLayout->addWidget(searchResultsWidget);
-    
     contentSplitter->addWidget(centerPanel);
     
     // 設置分割器比例
@@ -400,6 +379,7 @@ void Widget::createConnections()
     // 搜尋功能
     connect(searchButton, &QPushButton::clicked, this, &Widget::onSearchClicked);
     connect(searchEdit, &QLineEdit::returnPressed, this, &Widget::onSearchClicked);
+    connect(loadLocalFileButton, &QPushButton::clicked, this, &Widget::onLoadLocalFileClicked);
     
     // 播放控制按鈕
     connect(playPauseButton, &QPushButton::clicked, this, &Widget::onPlayPauseClicked);
@@ -409,28 +389,8 @@ void Widget::createConnections()
     connect(repeatButton, &QPushButton::clicked, this, &Widget::onRepeatClicked);
     
     // 播放清單管理
-    connect(addToPlaylistButton, &QPushButton::clicked, this, &Widget::onAddToPlaylistClicked);
-    connect(removeVideoButton, &QPushButton::clicked, this, &Widget::onRemoveVideoClicked);
     connect(playlistWidget, &QListWidget::itemDoubleClicked, this, &Widget::onVideoDoubleClicked);
     connect(playlistWidget, &QListWidget::itemSelectionChanged, this, &Widget::updateButtonStates);
-    
-    // 搜尋結果
-    connect(searchResultsWidget, &QListWidget::itemDoubleClicked, this, [this](QListWidgetItem* item) {
-        int index = searchResultsWidget->row(item);
-        if (index >= 0 && index < searchResults.size()) {
-            // 直接播放搜尋結果中的影片
-            VideoInfo video = searchResults[index];
-            currentVideoIndex = -1;  // 不屬於播放清單
-            
-            videoDisplayLabel->setText(createVideoDisplayHTML(video));
-            
-            videoTitleLabel->setText(video.title);
-            channelLabel->setText(video.channelTitle);
-            isPlaying = true;
-            playPauseButton->setText("⏸");
-            updateButtonStates();
-        }
-    });
     
     // 最愛按鈕
     connect(toggleFavoriteButton, &QPushButton::clicked, this, &Widget::onToggleFavoriteClicked);
@@ -440,103 +400,170 @@ void Widget::createConnections()
     connect(deletePlaylistButton, &QPushButton::clicked, this, &Widget::onDeletePlaylistClicked);
     connect(playlistComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &Widget::onPlaylistChanged);
     
-    // 網路請求
-    connect(networkManager, &QNetworkAccessManager::finished, this, &Widget::onNetworkReplyFinished);
+    // 媒體播放器
+    connect(mediaPlayer, &QMediaPlayer::playbackStateChanged, this, &Widget::onMediaPlayerStateChanged);
+    connect(mediaPlayer, &QMediaPlayer::positionChanged, this, &Widget::onMediaPlayerPositionChanged);
+    connect(mediaPlayer, &QMediaPlayer::durationChanged, this, &Widget::onMediaPlayerDurationChanged);
 }
 
 void Widget::onSearchClicked()
 {
-    QString query = searchEdit->text().trimmed();
-    if (query.isEmpty()) {
-        QMessageBox::warning(this, "搜尋", "請輸入搜尋關鍵字！");
+    QString link = searchEdit->text().trimmed();
+    if (link.isEmpty()) {
+        QMessageBox::warning(this, "播放", "請貼上 YouTube 連結！");
         return;
     }
     
-    searchYouTube(query);
+    playYouTubeLink(link);
 }
 
-void Widget::searchYouTube(const QString& query)
+void Widget::onLoadLocalFileClicked()
 {
-    QString url = QString("https://www.googleapis.com/youtube/v3/search"
-                         "?part=snippet"
-                         "&q=%1"
-                         "&type=video"
-                         "&maxResults=20"
-                         "&key=%2")
-                         .arg(QString(QUrl::toPercentEncoding(query)))
-                         .arg(apiKey);
+    QString filePath = QFileDialog::getOpenFileName(this, 
+        "選擇音樂檔案", 
+        QDir::homePath(),
+        "音樂檔案 (*.mp3 *.wav *.flac *.m4a *.ogg *.aac);;所有檔案 (*.*)");
     
-    QNetworkRequest request(url);
-    networkManager->get(request);
+    if (!filePath.isEmpty()) {
+        playLocalFile(filePath);
+    }
 }
 
-void Widget::onNetworkReplyFinished(QNetworkReply* reply)
+QString Widget::extractYouTubeVideoId(const QString& url)
 {
-    if (reply->error() == QNetworkReply::NoError) {
-        QByteArray response = reply->readAll();
-        QJsonDocument doc = QJsonDocument::fromJson(response);
-        
-        if (doc.isObject()) {
-            QJsonObject obj = doc.object();
-            if (obj.contains("items")) {
-                QJsonArray items = obj["items"].toArray();
-                showSearchResults(items);
-            }
+    // 支援多種 YouTube URL 格式
+    // https://www.youtube.com/watch?v=VIDEO_ID
+    // https://youtu.be/VIDEO_ID
+    // https://www.youtube.com/embed/VIDEO_ID
+    
+    QString videoId;
+    
+    if (url.contains("youtube.com/watch")) {
+        QRegularExpression rx("v=([a-zA-Z0-9_-]+)");
+        QRegularExpressionMatch match = rx.match(url);
+        if (match.hasMatch()) {
+            videoId = match.captured(1);
         }
-    } else {
-        QMessageBox::warning(this, "錯誤", 
-            QString("搜尋失敗：%1\n\n請確認：\n1. 網路連線正常\n2. API Key 有效\n3. YouTube API 配額未超過")
-            .arg(reply->errorString()));
+    } else if (url.contains("youtu.be/")) {
+        QRegularExpression rx("youtu\\.be/([a-zA-Z0-9_-]+)");
+        QRegularExpressionMatch match = rx.match(url);
+        if (match.hasMatch()) {
+            videoId = match.captured(1);
+        }
+    } else if (url.contains("youtube.com/embed/")) {
+        QRegularExpression rx("embed/([a-zA-Z0-9_-]+)");
+        QRegularExpressionMatch match = rx.match(url);
+        if (match.hasMatch()) {
+            videoId = match.captured(1);
+        }
     }
     
-    reply->deleteLater();
+    return videoId;
 }
 
-void Widget::showSearchResults(const QJsonArray& items)
+void Widget::playYouTubeLink(const QString& link)
 {
-    searchResults.clear();
-    searchResultsWidget->clear();
+    QString videoId = extractYouTubeVideoId(link);
     
-    for (const QJsonValue& value : items) {
-        QJsonObject item = value.toObject();
-        QJsonObject id = item["id"].toObject();
-        QJsonObject snippet = item["snippet"].toObject();
-        
-        VideoInfo video;
-        video.videoId = id["videoId"].toString();
-        video.title = snippet["title"].toString();
-        video.channelTitle = snippet["channelTitle"].toString();
-        video.description = snippet["description"].toString();
-        
-        QJsonObject thumbnails = snippet["thumbnails"].toObject();
-        if (thumbnails.contains("default")) {
-            video.thumbnailUrl = thumbnails["default"].toObject()["url"].toString();
-        }
-        
-        video.isFavorite = false;
-        searchResults.append(video);
-        
-        QString displayText = QString("%1\n%2").arg(video.title).arg(video.channelTitle);
-        QListWidgetItem* item = new QListWidgetItem(displayText);
-        searchResultsWidget->addItem(item);
+    if (videoId.isEmpty()) {
+        QMessageBox::warning(this, "錯誤", "無法識別 YouTube 連結格式！\n\n支援的格式：\n- https://www.youtube.com/watch?v=VIDEO_ID\n- https://youtu.be/VIDEO_ID");
+        return;
     }
     
-    if (searchResults.isEmpty()) {
-        QListWidgetItem* item = new QListWidgetItem("沒有找到結果");
-        item->setFlags(Qt::NoItemFlags);
-        searchResultsWidget->addItem(item);
-    }
+    // 停止當前播放
+    mediaPlayer->stop();
+    
+    // 創建影片資訊
+    VideoInfo video;
+    video.videoId = videoId;
+    video.title = "YouTube 影片";
+    video.channelTitle = "點擊連結在瀏覽器中觀看";
+    video.isFavorite = false;
+    video.isLocalFile = false;
+    video.filePath = "";
+    
+    // 顯示影片資訊
+    videoDisplayLabel->setText(createVideoDisplayHTML(video));
+    videoTitleLabel->setText(video.title);
+    channelLabel->setText(video.channelTitle);
+    
+    // 更新狀態（注意：YouTube 影片在瀏覽器播放，所以不改變播放狀態）
+    updateButtonStates();
+    
+    QMessageBox::information(this, "YouTube 連結", 
+        "已取得 YouTube 連結！\n請點擊顯示區域中的連結在瀏覽器中觀看影片。");
+}
+
+void Widget::playLocalFile(const QString& filePath)
+{
+    // 停止當前播放
+    mediaPlayer->stop();
+    
+    // 創建影片資訊
+    VideoInfo video;
+    video.filePath = filePath;
+    video.videoId = "";
+    
+    // 從檔案名提取標題
+    QFileInfo fileInfo(filePath);
+    video.title = fileInfo.baseName();
+    video.channelTitle = "本地音樂";
+    video.isFavorite = false;
+    video.isLocalFile = true;
+    
+    // 設置媒體播放器
+    mediaPlayer->setSource(QUrl::fromLocalFile(filePath));
+    mediaPlayer->play();
+    
+    // 顯示音樂資訊
+    QString displayHTML = QString(
+        "<div style='text-align: center;'>"
+        "<h2 style='color: #1DB954;'>🎵 本地音樂</h2>"
+        "<p style='font-size: 18px; margin: 20px 0;'>%1</p>"
+        "<p style='font-size: 14px; color: #888; margin: 10px 0;'>檔案: %2</p>"
+        "<p style='color: #666; font-size: 12px; margin-top: 30px;'>正在播放本地音樂檔案</p>"
+        "</div>"
+    ).arg(video.title.toHtmlEscaped()).arg(fileInfo.fileName().toHtmlEscaped());
+    
+    videoDisplayLabel->setText(displayHTML);
+    videoTitleLabel->setText(video.title);
+    channelLabel->setText(video.channelTitle);
+    
+    // 更新播放狀態
+    isPlaying = true;
+    playPauseButton->setText("⏸");
+    currentVideoIndex = -1;  // 不屬於播放清單
+    
+    updateButtonStates();
 }
 
 void Widget::onPlayPauseClicked()
 {
     if (currentVideoIndex >= 0) {
         // 有正在播放的影片
-        isPlaying = !isPlaying;
-        playPauseButton->setText(isPlaying ? "⏸" : "▶");
-        
-        // 注意：影片播放控制由瀏覽器處理
-        // 使用者需要點擊連結在瀏覽器中播放影片
+        if (currentPlaylistIndex >= 0 && currentPlaylistIndex < playlists.size()) {
+            const Playlist& playlist = playlists[currentPlaylistIndex];
+            if (currentVideoIndex < playlist.videos.size()) {
+                const VideoInfo& video = playlist.videos[currentVideoIndex];
+                
+                if (video.isLocalFile) {
+                    // 本地檔案，控制媒體播放器
+                    if (mediaPlayer->playbackState() == QMediaPlayer::PlayingState) {
+                        mediaPlayer->pause();
+                        isPlaying = false;
+                        playPauseButton->setText("▶");
+                    } else {
+                        mediaPlayer->play();
+                        isPlaying = true;
+                        playPauseButton->setText("⏸");
+                    }
+                } else {
+                    // YouTube 影片，只是切換狀態顯示
+                    isPlaying = !isPlaying;
+                    playPauseButton->setText(isPlaying ? "⏸" : "▶");
+                }
+            }
+        }
     } else {
         // 沒有影片，播放播放清單第一首
         if (currentPlaylistIndex >= 0 && currentPlaylistIndex < playlists.size()) {
@@ -546,6 +573,36 @@ void Widget::onPlayPauseClicked()
             }
         }
     }
+}
+
+void Widget::onMediaPlayerStateChanged()
+{
+    // 當媒體播放器狀態改變時更新按鈕
+    if (mediaPlayer->playbackState() == QMediaPlayer::PlayingState) {
+        isPlaying = true;
+        playPauseButton->setText("⏸");
+    } else if (mediaPlayer->playbackState() == QMediaPlayer::StoppedState) {
+        isPlaying = false;
+        playPauseButton->setText("▶");
+        
+        // 如果開啟循環或隨機播放，自動播放下一首
+        if (isRepeatMode || isShuffleMode) {
+            int nextIndex = getNextVideoIndex();
+            if (nextIndex >= 0) {
+                playVideo(nextIndex);
+            }
+        }
+    }
+}
+
+void Widget::onMediaPlayerPositionChanged(qint64 position)
+{
+    // 可以在這裡更新進度條（如果需要的話）
+}
+
+void Widget::onMediaPlayerDurationChanged(qint64 duration)
+{
+    // 可以在這裡設置進度條的最大值（如果需要的話）
 }
 
 void Widget::onPreviousClicked()
@@ -648,64 +705,6 @@ void Widget::onRepeatClicked()
             "}"
             "QPushButton:hover { background-color: #404040; }"
         );
-    }
-}
-
-void Widget::onAddToPlaylistClicked()
-{
-    int selectedRow = searchResultsWidget->currentRow();
-    if (selectedRow < 0 || selectedRow >= searchResults.size()) {
-        QMessageBox::information(this, "加入播放清單", "請先選擇一個搜尋結果！");
-        return;
-    }
-    
-    if (currentPlaylistIndex < 0 || currentPlaylistIndex >= playlists.size()) return;
-    
-    VideoInfo video = searchResults[selectedRow];
-    Playlist& playlist = playlists[currentPlaylistIndex];
-    
-    // 檢查是否已存在
-    bool exists = false;
-    for (const VideoInfo& v : playlist.videos) {
-        if (v.videoId == video.videoId) {
-            exists = true;
-            break;
-        }
-    }
-    
-    if (exists) {
-        QMessageBox::information(this, "加入播放清單", "此影片已在播放清單中！");
-        return;
-    }
-    
-    playlist.videos.append(video);
-    updatePlaylistDisplay();
-    updateButtonStates();
-    
-    QMessageBox::information(this, "加入播放清單", 
-        QString("已將「%1」加入到「%2」！").arg(video.title).arg(playlist.name));
-}
-
-void Widget::onRemoveVideoClicked()
-{
-    if (currentPlaylistIndex < 0 || currentPlaylistIndex >= playlists.size()) return;
-    
-    int selectedRow = playlistWidget->currentRow();
-    if (selectedRow < 0) return;
-    
-    Playlist& playlist = playlists[currentPlaylistIndex];
-    if (selectedRow < playlist.videos.size()) {
-        if (selectedRow == currentVideoIndex) {
-            videoDisplayLabel->clear();
-            currentVideoIndex = -1;
-            isPlaying = false;
-        } else if (selectedRow < currentVideoIndex) {
-            currentVideoIndex--;
-        }
-        
-        playlist.videos.removeAt(selectedRow);
-        updatePlaylistDisplay();
-        updateButtonStates();
     }
 }
 
@@ -879,8 +878,29 @@ void Widget::playVideo(int index)
     
     playedVideosInCurrentSession.insert(index);
     
-    // 顯示影片資訊和連結
-    videoDisplayLabel->setText(createVideoDisplayHTML(video));
+    // 停止當前播放
+    mediaPlayer->stop();
+    
+    if (video.isLocalFile) {
+        // 播放本地檔案
+        mediaPlayer->setSource(QUrl::fromLocalFile(video.filePath));
+        mediaPlayer->play();
+        
+        QFileInfo fileInfo(video.filePath);
+        QString displayHTML = QString(
+            "<div style='text-align: center;'>"
+            "<h2 style='color: #1DB954;'>🎵 本地音樂</h2>"
+            "<p style='font-size: 18px; margin: 20px 0;'>%1</p>"
+            "<p style='font-size: 14px; color: #888; margin: 10px 0;'>檔案: %2</p>"
+            "<p style='color: #666; font-size: 12px; margin-top: 30px;'>正在播放本地音樂檔案</p>"
+            "</div>"
+        ).arg(video.title.toHtmlEscaped()).arg(fileInfo.fileName().toHtmlEscaped());
+        
+        videoDisplayLabel->setText(displayHTML);
+    } else {
+        // 顯示 YouTube 影片資訊
+        videoDisplayLabel->setText(createVideoDisplayHTML(video));
+    }
     
     // 更新顯示
     videoTitleLabel->setText(video.title);
@@ -908,15 +928,12 @@ void Widget::updateButtonStates()
     int selectedRow = playlistWidget->currentRow();
     bool hasSelection = selectedRow >= 0;
     bool hasVideoPlaying = currentVideoIndex >= 0;
-    bool hasSearchResult = searchResultsWidget->currentRow() >= 0;
     
-    playPauseButton->setEnabled(hasVideos);
+    playPauseButton->setEnabled(hasVideos || hasVideoPlaying);
     previousButton->setEnabled(hasVideos);
     nextButton->setEnabled(hasVideos);
-    removeVideoButton->setEnabled(hasSelection);
     deletePlaylistButton->setEnabled(playlists.size() > 1);
     toggleFavoriteButton->setEnabled(hasVideoPlaying);
-    addToPlaylistButton->setEnabled(hasSearchResult);
 }
 
 void Widget::savePlaylistsToFile()
@@ -940,11 +957,13 @@ void Widget::savePlaylistsToFile()
         for (const VideoInfo& video : playlist.videos) {
             QJsonObject videoObj;
             videoObj["videoId"] = video.videoId;
+            videoObj["filePath"] = video.filePath;
             videoObj["title"] = video.title;
             videoObj["channelTitle"] = video.channelTitle;
             videoObj["thumbnailUrl"] = video.thumbnailUrl;
             videoObj["description"] = video.description;
             videoObj["isFavorite"] = video.isFavorite;
+            videoObj["isLocalFile"] = video.isLocalFile;
             videosArray.append(videoObj);
         }
         playlistObj["videos"] = videosArray;
@@ -998,11 +1017,13 @@ void Widget::loadPlaylistsFromFile()
             QJsonObject videoObj = videoValue.toObject();
             VideoInfo video;
             video.videoId = videoObj["videoId"].toString();
+            video.filePath = videoObj["filePath"].toString();
             video.title = videoObj["title"].toString();
             video.channelTitle = videoObj["channelTitle"].toString();
             video.thumbnailUrl = videoObj["thumbnailUrl"].toString();
             video.description = videoObj["description"].toString();
             video.isFavorite = videoObj["isFavorite"].toBool();
+            video.isLocalFile = videoObj["isLocalFile"].toBool();
             
             playlist.videos.append(video);
         }
